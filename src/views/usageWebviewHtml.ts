@@ -146,7 +146,7 @@ export function getUsageWebviewHtml(
       height: 100%;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 0;
+      padding: 0 10px 8px 10px;
     }
 
     table {
