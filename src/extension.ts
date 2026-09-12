@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { DataProvider } from './dataProvider';
 import { QuotaWebviewProvider } from './quotaWebviewProvider';
 
@@ -8,7 +11,7 @@ let refreshTimer: NodeJS.Timeout | undefined;
 export function activate(context: vscode.ExtensionContext) {
   console.log('[9Router Monitor] Extension activated');
 
-  // 1. Register Single Clean Quota Tracker Webview Provider
+  // 1. Single Native View with Split Drag Layout
   const quotaWebviewProvider = new QuotaWebviewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -32,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('9router.refreshStats', async () => {
       await quotaWebviewProvider.refresh();
       await updateStatusBar();
-      vscode.window.showInformationMessage('9Router: Quotas refreshed');
+      vscode.window.showInformationMessage('9Router: Refreshed');
     })
   );
 
@@ -114,11 +117,14 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // 4. Initial fetch & timer setup (15 mins default)
+  // 4. Hot-Reload Trigger Watcher (Auto-reload VS Code on touch ~/.9router/reload-trigger)
+  setupAutoReloadTrigger(context);
+
+  // 5. Initial fetch & timer setup (15 mins default)
   updateStatusBar();
   startPolling(context, quotaWebviewProvider);
 
-  // 5. Watch configuration changes
+  // 6. Watch configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('9router')) {
@@ -127,6 +133,33 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
+}
+
+function setupAutoReloadTrigger(context: vscode.ExtensionContext) {
+  const triggerDir = path.join(os.homedir(), '.9router');
+  const triggerFile = path.join(triggerDir, 'reload-trigger');
+
+  try {
+    if (!fs.existsSync(triggerDir)) {
+      fs.mkdirSync(triggerDir, { recursive: true });
+    }
+    if (!fs.existsSync(triggerFile)) {
+      fs.writeFileSync(triggerFile, String(Date.now()));
+    }
+
+    fs.watchFile(triggerFile, { interval: 300 }, () => {
+      console.log('[9Router Monitor] Auto-reload triggered');
+      vscode.commands.executeCommand('workbench.action.reloadWindow');
+    });
+
+    context.subscriptions.push({
+      dispose: () => {
+        fs.unwatchFile(triggerFile);
+      }
+    });
+  } catch (err) {
+    console.warn('[9Router] Could not setup reload trigger watcher:', err);
+  }
 }
 
 function startPolling(

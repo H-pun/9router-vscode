@@ -1,12 +1,17 @@
-import { RouterQuotaData, ProviderConnection, QuotaItem } from '../dataProvider';
+import { RouterQuotaData, ProviderConnection, QuotaItem, UsageStreamData } from '../dataProvider';
 
 export function getNativeAccordionHtml(
   data: RouterQuotaData,
   providerIconMap: Record<string, string>,
-  codiconCssUri: string
+  codiconCssUri: string,
+  topologyFlowJsUri: string,
+  topologyFlowCssUri: string
 ): string {
   const connectionsJson = JSON.stringify(data.connections);
   const iconMapJson = JSON.stringify(providerIconMap);
+  const initialUsageJson = JSON.stringify(data.initialUsage || { recentRequests: [], activeRequests: [], byProvider: {} });
+  const topologyProvidersJson = JSON.stringify(data.topologyProviders || []);
+  const initialChartJson = JSON.stringify(data.initialChartData || []);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -15,6 +20,7 @@ export function getNativeAccordionHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>9Router</title>
   <link rel="stylesheet" href="${codiconCssUri}">
+  <link rel="stylesheet" href="${topologyFlowCssUri}">
   <style>
     :root {
       /* 100% Dynamic VS Code Theme Tokens */
@@ -36,6 +42,7 @@ export function getNativeAccordionHtml(
       --menu-border: var(--vscode-menu-border, var(--vscode-dropdown-border, rgba(128, 128, 128, 0.25)));
       --menu-hover: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08)));
       --focus-border: var(--vscode-focusBorder, #007fd4);
+      --tab-active-border: var(--vscode-panelTitle-activeBorder, var(--vscode-charts-orange, #f97316));
       --green: var(--vscode-charts-green, #388a34);
       --orange: var(--vscode-charts-orange, #d18616);
       --red: var(--vscode-charts-red, #f14c4c);
@@ -51,21 +58,54 @@ export function getNativeAccordionHtml(
       user-select: none;
     }
 
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
     body {
       background-color: var(--bg);
       color: var(--fg);
       font-family: var(--font);
       font-size: var(--font-size);
       line-height: 1.4;
-      padding: 0;
-      overflow-x: hidden;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* Section Container */
-    .section-box {
-      margin-bottom: 0;
+    /* Resizable Container Splitter Layout */
+    .split-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
       position: relative;
+    }
+
+    /* Section Panels */
+    .section-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 28px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .section-panel.panel-quota {
+      flex: 1 1 50%;
+      min-height: 60px;
+    }
+
+    .section-panel.panel-usage {
+      flex: 1 1 50%;
+      min-height: 60px;
+    }
+
+    .section-panel.collapsed {
+      flex: 0 0 26px !important;
+      min-height: 26px !important;
+      max-height: 26px !important;
     }
 
     /* Native Explorer Section Header */
@@ -79,10 +119,10 @@ export function getNativeAccordionHtml(
       border-top: 1px solid var(--sec-border);
       cursor: pointer;
       min-height: 24px;
-      position: relative;
+      flex-shrink: 0;
     }
 
-    .section-box:first-child .section-header {
+    .panel-quota .section-header {
       border-top: none;
     }
 
@@ -107,10 +147,38 @@ export function getNativeAccordionHtml(
     .section-actions {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
 
-    /* Custom VS Code Native Debug-Style Dropdown Menu */
+    /* Section Content (Independent Scrollable Container) */
+    .section-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .section-panel.collapsed .section-content {
+      display: none;
+    }
+
+    /* Native Splitter Resizer Bar */
+    .splitter-bar {
+      height: 4px;
+      margin: -2px 0;
+      cursor: row-resize;
+      background: transparent;
+      z-index: 50;
+      position: relative;
+      transition: background 0.15s ease;
+    }
+
+    .splitter-bar:hover, .splitter-bar.dragging {
+      background: var(--focus-border);
+      height: 4px;
+    }
+
+    /* Custom VS Code Native Dropdown Menu */
     .custom-dropdown-wrap {
       position: relative;
       display: inline-block;
@@ -160,7 +228,7 @@ export function getNativeAccordionHtml(
       transform: rotate(180deg);
     }
 
-    /* Floating Popup Menu (Anchored to Right Edge so it NEVER clips) */
+    /* Floating Popup Menu */
     .custom-dropdown-menu {
       display: none;
       position: absolute;
@@ -230,7 +298,7 @@ export function getNativeAccordionHtml(
       text-align: left;
     }
 
-    /* Native Explorer Action Button */
+    /* Native Action Button */
     .icon-btn {
       background: transparent;
       border: none;
@@ -249,14 +317,6 @@ export function getNativeAccordionHtml(
     .icon-btn:hover {
       background: var(--btn-hover-bg);
       color: var(--fg);
-    }
-
-    .section-body {
-      padding: 4px 0 6px 0;
-    }
-
-    .section-body.collapsed {
-      display: none;
     }
 
     /* ================= LEVEL 1: PROVIDER GROUP ================= */
@@ -553,39 +613,155 @@ export function getNativeAccordionHtml(
     }
 
     .empty-msg {
-      padding: 4px 10px 4px 20px;
+      padding: 6px 10px 6px 16px;
       font-size: 11px;
       color: var(--text-muted);
       font-style: italic;
     }
 
-    /* Usage Placeholder */
-    .usage-placeholder {
-      padding: 16px 14px;
-      text-align: center;
+    /* ================= USAGE SECTION (NATIVE 3 SUB-TABS) ================= */
+    .usage-tabs-header {
       display: flex;
-      flex-direction: column;
+      gap: 2px;
+      padding: 2px 4px 0 4px;
+      border-bottom: 1px solid var(--sec-border);
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    .usage-tab-btn {
+      display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
+      padding: 4px 7px 5px 7px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 500;
       color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color 0.1s ease, border-color 0.1s ease;
+      outline: none;
     }
 
-    .placeholder-icon {
-      font-size: 20px;
-      color: var(--text-muted);
-      margin-bottom: 2px;
-    }
-
-    .placeholder-title {
-      font-size: 12px;
-      font-weight: 600;
+    .usage-tab-btn:hover {
       color: var(--fg);
     }
 
-    .placeholder-sub {
+    .usage-tab-btn.active {
+      color: var(--fg);
+      font-weight: 600;
+      border-bottom-color: var(--tab-active-border);
+    }
+
+    .usage-tab-pane {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .usage-tab-pane.active {
+      display: block;
+    }
+
+    /* React Flow Container */
+    #xyflow-root, #chart-root {
+      width: 100%;
+      height: 100%;
+      min-height: 220px;
+      position: relative;
+    }
+
+    .react-flow__attribution {
+      display: none !important;
+    }
+
+    /* Recent Requests Table */
+    .recent-table-card {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .recent-table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      background: var(--sec-header-bg);
+      border-bottom: 1px solid var(--sec-border);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .col-model { flex: 1; min-width: 0; }
+    .col-tokens { width: 100px; text-align: right; }
+    .col-time { width: 60px; text-align: right; }
+
+    .recent-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .recent-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(128, 128, 128, 0.08);
       font-size: 11px;
-      max-width: 240px;
-      line-height: 1.35;
+      font-variant-numeric: tabular-nums;
+      transition: background 0.08s ease;
+    }
+
+    .recent-row:hover {
+      background: var(--hover-bg);
+    }
+
+    .model-cell {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .recent-model-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--fg);
+      font-size: 11px;
+    }
+
+    .tokens-cell {
+      width: 100px;
+      text-align: right;
+      color: var(--text-muted);
+      font-size: 10.5px;
+      white-space: nowrap;
+    }
+
+    .tokens-in { color: var(--fg); font-weight: 500; }
+    .tokens-out { color: var(--text-muted); }
+
+    .time-cell {
+      width: 60px;
+      text-align: right;
+      color: var(--blue);
+      font-size: 10.5px;
+      white-space: nowrap;
     }
 
     .codicon {
@@ -596,82 +772,171 @@ export function getNativeAccordionHtml(
 </head>
 <body>
 
-  <!-- SECTION 1: QUOTA TRACKER -->
-  <div class="section-box">
-    <div class="section-header" onclick="toggleSection('quota')">
-      <div class="section-left">
-        <i class="codicon codicon-chevron-down" id="chevron-quota"></i>
-        <span class="section-title">Quota Tracker</span>
-      </div>
-      <div class="section-actions" onclick="event.stopPropagation()">
-        <!-- Custom Dropdown Menu (Anchored Right so it stays 100% on-screen) -->
-        <div class="custom-dropdown-wrap" id="filter-dropdown-wrap">
-          <button type="button" class="custom-dropdown-trigger" id="filter-dropdown-btn" title="Filter Accounts">
-            <span class="filter-trigger-label" id="filter-current-label">Active</span>
-            <i class="codicon codicon-chevron-down filter-trigger-arrow"></i>
-          </button>
+  <div class="split-container" id="split-container">
+    
+    <!-- PANEL 1: QUOTA TRACKER -->
+    <div class="section-panel panel-quota" id="panel-quota">
+      <div class="section-header" onclick="toggleSection('quota')">
+        <div class="section-left">
+          <i class="codicon codicon-chevron-down" id="chevron-quota"></i>
+          <span class="section-title">Quota Tracker</span>
+        </div>
+        <div class="section-actions" onclick="event.stopPropagation()">
+          <!-- Filter Dropdown -->
+          <div class="custom-dropdown-wrap" id="filter-dropdown-wrap">
+            <button type="button" class="custom-dropdown-trigger" id="filter-dropdown-btn" title="Filter Accounts">
+              <span class="filter-trigger-label" id="filter-current-label">Active</span>
+              <i class="codicon codicon-chevron-down filter-trigger-arrow"></i>
+            </button>
 
-          <!-- Floating Popup Menu (Right anchored, Left aligned text) -->
-          <div class="custom-dropdown-menu" id="filter-dropdown-menu">
-            <div class="dropdown-menu-item selected" data-value="active" onclick="selectFilter('active', 'Active')">
-              <span class="item-check"><i class="codicon codicon-check"></i></span>
-              <span class="item-label">Active</span>
-            </div>
-            <div class="dropdown-menu-item" data-value="all" onclick="selectFilter('all', 'All')">
-              <span class="item-check"><i class="codicon codicon-check"></i></span>
-              <span class="item-label">All</span>
-            </div>
-            <div class="dropdown-menu-item" data-value="idle" onclick="selectFilter('idle', 'Inactive / Turn Off')">
-              <span class="item-check"><i class="codicon codicon-check"></i></span>
-              <span class="item-label">Inactive / Turn Off</span>
+            <div class="custom-dropdown-menu" id="filter-dropdown-menu">
+              <div class="dropdown-menu-item selected" data-value="active" onclick="selectFilter('active', 'Active')">
+                <span class="item-check"><i class="codicon codicon-check"></i></span>
+                <span class="item-label">Active</span>
+              </div>
+              <div class="dropdown-menu-item" data-value="all" onclick="selectFilter('all', 'All')">
+                <span class="item-check"><i class="codicon codicon-check"></i></span>
+                <span class="item-label">All</span>
+              </div>
+              <div class="dropdown-menu-item" data-value="idle" onclick="selectFilter('idle', 'Inactive / Turn Off')">
+                <span class="item-check"><i class="codicon codicon-check"></i></span>
+                <span class="item-label">Inactive / Turn Off</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Official VS Code Refresh Codicon -->
-        <button class="icon-btn" id="btn-refresh-quota" title="Refresh Quotas">
-          <i class="codicon codicon-refresh"></i>
+          <!-- Section Quota Refresh Button -->
+          <button class="icon-btn" id="btn-refresh-quota" title="Refresh Quotas">
+            <i class="codicon codicon-refresh"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="section-content" id="content-quota">
+        <div id="tree-root"></div>
+      </div>
+    </div>
+
+    <!-- NATIVE SPLITTER BAR (DRAGGABLE RESIZER) -->
+    <div class="splitter-bar" id="splitter-bar" title="Drag to resize panels"></div>
+
+    <!-- PANEL 2: USAGE (3 SUB-TABS: Topology | Activity | Recent Requests) -->
+    <div class="section-panel panel-usage" id="panel-usage">
+      <div class="section-header" onclick="toggleSection('usage')">
+        <div class="section-left">
+          <i class="codicon codicon-chevron-down" id="chevron-usage"></i>
+          <span class="section-title">Usage</span>
+        </div>
+        <div class="section-actions" onclick="event.stopPropagation()">
+          <span style="font-size: 9.5px; color: var(--green); display: inline-flex; align-items: center; gap: 3px;">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 4px var(--green);"></span>
+            Live
+          </span>
+        </div>
+      </div>
+
+      <!-- Sub-Tabs Header (3 Sub-Tabs) -->
+      <div class="usage-tabs-header">
+        <button type="button" class="usage-tab-btn active" id="tab-btn-graph" onclick="switchUsageTab('graph')">
+          <i class="codicon codicon-graph"></i>
+          <span>Topology</span>
+        </button>
+        <button type="button" class="usage-tab-btn" id="tab-btn-chart" onclick="switchUsageTab('chart')">
+          <i class="codicon codicon-pulse"></i>
+          <span>Activity</span>
+        </button>
+        <button type="button" class="usage-tab-btn" id="tab-btn-recent" onclick="switchUsageTab('recent')">
+          <i class="codicon codicon-history"></i>
+          <span>Recent Requests</span>
         </button>
       </div>
+
+      <div class="section-content" id="content-usage">
+        <!-- TAB 1: 1:1 React Flow Topology Canvas -->
+        <div class="usage-tab-pane active" id="pane-graph">
+          <div id="xyflow-root"></div>
+        </div>
+
+        <!-- TAB 2: 1:1 Recharts Usage Area Chart (Activity) -->
+        <div class="usage-tab-pane" id="pane-chart">
+          <div id="chart-root"></div>
+        </div>
+
+        <!-- TAB 3: Recent Requests Table -->
+        <div class="usage-tab-pane" id="pane-recent">
+          <div class="recent-table-card">
+            <div class="recent-table-header">
+              <span class="col-model">Model</span>
+              <span class="col-tokens">In / Out</span>
+              <span class="col-time">When</span>
+            </div>
+            <div class="recent-list" id="recent-requests-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="section-body" id="body-quota">
-      <div id="tree-root"></div>
-    </div>
-  </div>
-
-  <!-- SECTION 2: USAGE (Placeholder) -->
-  <div class="section-box">
-    <div class="section-header" onclick="toggleSection('usage')">
-      <div class="section-left">
-        <i class="codicon codicon-chevron-right" id="chevron-usage"></i>
-        <span class="section-title">Usage</span>
-      </div>
-      <div class="section-actions" onclick="event.stopPropagation()">
-        <span style="font-size: 9.5px; color: var(--text-muted); opacity: 0.8;">Phase 2</span>
-      </div>
-    </div>
-
-    <div class="section-body collapsed" id="body-usage">
-      <div class="usage-placeholder">
-        <i class="codicon codicon-graph placeholder-icon"></i>
-        <div class="placeholder-title">Usage Analytics & Metrics</div>
-        <div class="placeholder-sub">Request logs, token breakdown by model/account, and live throughput will appear here.</div>
-      </div>
-    </div>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
+    window.__VSCODE__ = vscode;
+    window.__ICON_MAP__ = ${iconMapJson};
+    window.__INITIAL_USAGE__ = ${initialUsageJson};
+    window.__TOPOLOGY_PROVIDERS__ = ${topologyProvidersJson};
+    window.__INITIAL_CHART_DATA__ = ${initialChartJson};
+  </script>
+
+  <!-- Load 1:1 @xyflow/react & Recharts Bundle -->
+  <script src="${topologyFlowJsUri}"></script>
+
+  <script>
     const connections = ${connectionsJson};
     const iconMap = ${iconMapJson};
+    let initialUsage = ${initialUsageJson};
     
-    let currentFilter = 'active'; // Default active
+    let currentFilter = 'active';
+    let currentUsageTab = 'graph';
     const groupCollapseMap = {};
     const accountCollapseMap = {};
-    const sectionCollapseMap = { quota: false, usage: true };
+    const sectionCollapseMap = { quota: false, usage: false };
 
-    // Dropdown toggle & close-outside handler
+    // ================= SPLITTER RESIZER LOGIC =================
+    const splitter = document.getElementById('splitter-bar');
+    const panelQuota = document.getElementById('panel-quota');
+    const panelUsage = document.getElementById('panel-usage');
+    const splitContainer = document.getElementById('split-container');
+    let isDragging = false;
+
+    splitter.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      splitter.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+      e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const containerRect = splitContainer.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top;
+      const totalH = containerRect.height;
+      
+      const quotaH = Math.max(60, Math.min(relativeY, totalH - 60));
+      const usageH = totalH - quotaH - 4;
+
+      panelQuota.style.flex = \`0 0 \${quotaH}px\`;
+      panelUsage.style.flex = \`0 0 \${usageH}px\`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        splitter.classList.remove('dragging');
+        document.body.style.cursor = '';
+      }
+    });
+
+    // Dropdown toggle
     const dropdownWrap = document.getElementById('filter-dropdown-wrap');
     const triggerBtn = document.getElementById('filter-dropdown-btn');
     const currentLabelEl = document.getElementById('filter-current-label');
@@ -695,6 +960,21 @@ export function getNativeAccordionHtml(
       renderGroupedTree();
     }
 
+    function switchUsageTab(tabName) {
+      currentUsageTab = tabName;
+      document.getElementById('tab-btn-graph').classList.toggle('active', tabName === 'graph');
+      document.getElementById('tab-btn-chart').classList.toggle('active', tabName === 'chart');
+      document.getElementById('tab-btn-recent').classList.toggle('active', tabName === 'recent');
+
+      document.getElementById('pane-graph').classList.toggle('active', tabName === 'graph');
+      document.getElementById('pane-chart').classList.toggle('active', tabName === 'chart');
+      document.getElementById('pane-recent').classList.toggle('active', tabName === 'recent');
+
+      if (tabName === 'chart') {
+        window.dispatchEvent(new Event('resize'));
+      }
+    }
+
     connections.forEach(c => {
       if (accountCollapseMap[c.id] === undefined) {
         accountCollapseMap[c.id] = !c.isActive;
@@ -709,8 +989,8 @@ export function getNativeAccordionHtml(
       if (p === 'azure') return 'Azure OpenAI';
       if (p === 'kiro') return 'Kiro AI';
       if (p === 'codex') return 'Codex';
-      if (p === 'mimo') return 'MiMo';
-      if (p === 'opencode') return 'OpenCode';
+      if (p === 'mimo') return 'MiMo Code Free';
+      if (p === 'opencode') return 'OpenCode Free';
       return provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Provider';
     }
 
@@ -729,6 +1009,25 @@ export function getNativeAccordionHtml(
       if (days > 0) return \`in \${days}d \${hours}h\`;
       if (hours > 0) return \`in \${hours}h \${mins}m\`;
       return \`in \${mins}m\`;
+    }
+
+    function formatRelativeTime(timestamp) {
+      if (!timestamp) return '-';
+      const time = new Date(timestamp).getTime();
+      const diffSec = Math.floor((Date.now() - time) / 1000);
+      if (diffSec < 15) return 'Just now';
+      if (diffSec < 60) return \`\${diffSec}s ago\`;
+      const mins = Math.floor(diffSec / 60);
+      if (mins < 60) return \`\${mins}m ago\`;
+      const hours = Math.floor(mins / 60);
+      return \`\${hours}h ago\`;
+    }
+
+    function formatTokensNumber(num) {
+      if (!num || num === 0) return '0';
+      if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'm';
+      if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
+      return String(num);
     }
 
     function getProviderIconHtml(provKey) {
@@ -753,7 +1052,6 @@ export function getNativeAccordionHtml(
       const root = document.getElementById('tree-root');
       root.innerHTML = '';
 
-      // Filter connections based on dropdown
       let filteredConns = connections;
       if (currentFilter === 'active') {
         filteredConns = connections.filter(c => c.isActive);
@@ -786,7 +1084,6 @@ export function getNativeAccordionHtml(
         groupEl.className = 'provider-group';
 
         groupEl.innerHTML = \`
-          <!-- LEVEL 1: PROVIDER HEADER -->
           <div class="provider-header" onclick="toggleGroup('\${provKey}')">
             <div class="provider-left">
               <i class="codicon \${isGroupCollapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
@@ -798,7 +1095,6 @@ export function getNativeAccordionHtml(
             </div>
           </div>
 
-          <!-- LEVEL 2: ACCOUNTS CONTAINER -->
           <div class="accounts-container \${isGroupCollapsed ? 'collapsed' : ''}" id="group-\${provKey}">
             \${renderAccounts(groupConns)}
           </div>
@@ -816,7 +1112,6 @@ export function getNativeAccordionHtml(
 
         html += \`
           <div class="account-item">
-            <!-- LEVEL 2: ACCOUNT ROW -->
             <div class="account-row" onclick="toggleAccount('\${c.id}')">
               <div class="account-left">
                 <i class="codicon \${isAccCollapsed ? 'codicon-chevron-right' : 'codicon-chevron-down'}"></i>
@@ -827,17 +1122,14 @@ export function getNativeAccordionHtml(
                 <span class="pill-tag">#\${c.priority}</span>
 
                 <div class="account-actions">
-                  <!-- Manual Refresh (Official Codicon) -->
                   <button class="icon-btn" onclick="refreshSingle('\${c.id}', '\${profileName}')" title="Refresh Quota for \${profileName}">
                     <i class="codicon codicon-refresh"></i>
                   </button>
 
-                  <!-- Test Connection (Official Zap Codicon) -->
                   <button class="icon-btn" onclick="testConn('\${c.id}', '\${profileName}')" title="Test Connection">
                     <i class="codicon codicon-zap"></i>
                   </button>
 
-                  <!-- Native-style ON/OFF Toggle Switch -->
                   <div class="toggle-switch-box" onclick="toggleActive('\${c.id}', \${!c.isActive})" title="\${c.isActive ? 'Active (Click to Turn OFF)' : 'Idle (Click to Turn ON)'}">
                     <div class="toggle-track \${c.isActive ? 'active' : ''}">
                       <div class="toggle-thumb"></div>
@@ -847,7 +1139,6 @@ export function getNativeAccordionHtml(
               </div>
             </div>
 
-            <!-- LEVEL 3: MODEL QUOTA ROWS -->
             <div class="models-list \${isAccCollapsed ? 'collapsed' : ''}" id="models-\${c.id}">
               \${renderModels(c.quotas)}
             </div>
@@ -891,12 +1182,60 @@ export function getNativeAccordionHtml(
       return html;
     }
 
+    /* ================= RECENT REQUESTS TABLE ================= */
+    function renderRecentRequests(requests) {
+      const list = document.getElementById('recent-requests-list');
+      if (!list) return;
+
+      if (!requests || requests.length === 0) {
+        list.innerHTML = '<div class="empty-msg">No recent request logs.</div>';
+        return;
+      }
+
+      let html = '';
+      requests.slice(0, 30).forEach(r => {
+        const provKey = (r.provider || 'ai').toLowerCase();
+        const logo = getProviderIconHtml(provKey);
+        const inTok = formatTokensNumber(r.promptTokens);
+        const outTok = formatTokensNumber(r.completionTokens);
+        const when = formatRelativeTime(r.timestamp);
+
+        html += \`
+          <div class="recent-row">
+            <div class="model-cell">
+              \${logo}
+              <span class="recent-model-name" title="\${r.model}">\${r.model}</span>
+            </div>
+            <div class="tokens-cell">
+              <span class="tokens-in">\${inTok}</span>
+              <span style="opacity: 0.5;"> / </span>
+              <span class="tokens-out">\${outTok}</span>
+            </div>
+            <div class="time-cell">\${when}</div>
+          </div>
+        \`;
+      });
+
+      list.innerHTML = html;
+    }
+
+    // Forward SSE stream events to the React Flow window
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      if (msg && msg.type === 'usageStream' && msg.data) {
+        const streamData = msg.data;
+        if (streamData.recentRequests && streamData.recentRequests.length > 0) {
+          renderRecentRequests(streamData.recentRequests);
+        }
+      }
+    });
+
     function toggleSection(secId) {
       sectionCollapseMap[secId] = !sectionCollapseMap[secId];
-      const body = document.getElementById('body-' + secId);
+      const panel = document.getElementById('panel-' + secId);
       const chevron = document.getElementById('chevron-' + secId);
-      if (body) {
-        body.classList.toggle('collapsed', sectionCollapseMap[secId]);
+      if (panel) {
+        panel.classList.toggle('collapsed', sectionCollapseMap[secId]);
       }
       if (chevron) {
         chevron.className = 'codicon ' + (sectionCollapseMap[secId] ? 'codicon-chevron-right' : 'codicon-chevron-down');
@@ -925,12 +1264,22 @@ export function getNativeAccordionHtml(
       vscode.postMessage({ command: 'toggleActive', connectionId: id, nextActive });
     }
 
-    document.getElementById('btn-refresh-quota').addEventListener('click', () => {
+    document.getElementById('btn-refresh-quota').addEventListener('click', (e) => {
+      e.stopPropagation();
       vscode.postMessage({ command: 'refresh' });
     });
 
-    // Initial render
+    // Initial renders
     renderGroupedTree();
+    if (initialUsage && initialUsage.recentRequests) {
+      renderRecentRequests(initialUsage.recentRequests);
+    }
+
+    setInterval(() => {
+      if (initialUsage && initialUsage.recentRequests) {
+        renderRecentRequests(initialUsage.recentRequests);
+      }
+    }, 10000);
   </script>
 </body>
 </html>`;

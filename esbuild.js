@@ -4,7 +4,8 @@ const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 async function main() {
-  const ctx = await esbuild.context({
+  // 1. Build Extension Backend (Node.js)
+  const extCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
     format: 'cjs',
@@ -17,11 +18,30 @@ async function main() {
     logLevel: 'info',
   });
 
+  // 2. Build React + @xyflow/react Browser Bundle for Webview
+  const graphCtx = await esbuild.context({
+    entryPoints: ['src/graph-app/index.tsx'],
+    bundle: true,
+    format: 'iife',
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: 'browser',
+    outfile: 'media/topologyFlow.js',
+    define: {
+      'process.env.NODE_ENV': production ? '"production"' : '"development"',
+    },
+    logLevel: 'info',
+  });
+
   if (watch) {
-    await ctx.watch();
+    await extCtx.watch();
+    await graphCtx.watch();
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await extCtx.rebuild();
+    await graphCtx.rebuild();
+    await extCtx.dispose();
+    await graphCtx.dispose();
   }
 }
 

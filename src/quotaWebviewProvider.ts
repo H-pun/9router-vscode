@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { DataProvider } from './dataProvider';
+import { DataProvider, UsageStreamData } from './dataProvider';
 import { getNativeAccordionHtml } from './views/nativeAccordionView';
 
 export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = '9router.quotaTrackerView';
   private _view?: vscode.WebviewView;
+  private _streamDisposer?: () => void;
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -23,16 +24,30 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
     };
 
     this.refresh();
+    this.startLiveStream();
+
+    webviewView.onDidDispose(() => {
+      if (this._streamDisposer) {
+        this._streamDisposer();
+      }
+    });
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
         case 'refresh':
           await this.refresh();
-          vscode.window.showInformationMessage('9Router: Quotas refreshed');
+          vscode.window.showInformationMessage('9Router: Refreshed');
           break;
         case 'refreshSingle':
           await this.refresh();
           vscode.window.showInformationMessage(`9Router: Quota refreshed for ${data.name || 'account'}`);
+          break;
+        case 'fetchChart':
+          const chartData = await DataProvider.getInstance().fetchChartData(data.period || 'today');
+          webviewView.webview.postMessage({
+            type: 'chartData',
+            data: chartData
+          });
           break;
         case 'test':
           await vscode.window.withProgress(
@@ -70,6 +85,21 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private startLiveStream() {
+    if (this._streamDisposer) {
+      this._streamDisposer();
+    }
+
+    this._streamDisposer = DataProvider.getInstance().listenUsageStream((streamData: UsageStreamData) => {
+      if (this._view) {
+        this._view.webview.postMessage({
+          type: 'usageStream',
+          data: streamData
+        });
+      }
+    });
+  }
+
   public async refresh() {
     if (this._view) {
       const data = await DataProvider.getInstance().fetchQuotas();
@@ -77,7 +107,20 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
       const codiconCssUri = this._view.webview
         .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicons', 'codicon.css'))
         .toString();
-      this._view.webview.html = getNativeAccordionHtml(data, iconMap, codiconCssUri);
+      const topologyFlowJsUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.js'))
+        .toString();
+      const topologyFlowCssUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.css'))
+        .toString();
+
+      this._view.webview.html = getNativeAccordionHtml(
+        data,
+        iconMap,
+        codiconCssUri,
+        topologyFlowJsUri,
+        topologyFlowCssUri
+      );
     }
   }
 
@@ -98,7 +141,6 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    // Map common aliases
     if (iconMap['claude'] && !iconMap['claude-code']) iconMap['claude-code'] = iconMap['claude'];
     if (iconMap['azure'] && !iconMap['azure-openai']) iconMap['azure-openai'] = iconMap['azure'];
     if (iconMap['gemini'] && !iconMap['gemini-cli']) iconMap['gemini-cli'] = iconMap['gemini'];

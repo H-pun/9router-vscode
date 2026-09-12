@@ -7,38 +7,69 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 
 export interface QuotaItem {
-  id: string;
+  name: string;
   displayName: string;
   used: number;
   total: number;
+  unlimited: boolean;
   remainingPercentage: number;
   resetAt?: string;
-  unlimited?: boolean;
 }
 
 export interface ProviderConnection {
   id: string;
-  provider: string;
   name: string;
+  provider: string;
   email?: string;
   priority: number;
   isActive: boolean;
-  status: 'active' | 'online' | 'error' | 'idle';
-  plan: string;
+  status?: string;
   quotas: QuotaItem[];
-  lastRefresh?: string;
-  error?: string;
+  rawQuotas?: Record<string, any>;
+}
+
+export interface UsageStreamData {
+  totalRequests: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  activeRequests: Array<{ provider?: string; model?: string; account?: string }>;
+  recentRequests: Array<{
+    timestamp: string;
+    model: string;
+    provider: string;
+    promptTokens: number;
+    completionTokens: number;
+    cachedTokens?: number;
+    status?: string;
+  }>;
+  byProvider: Record<string, any>;
+  lastUpdated?: string;
+}
+
+export interface TopologyProvider {
+  provider: string;
+  name: string;
+}
+
+export interface ChartDataPoint {
+  label: string;
+  tokens: number;
+  cost: number;
 }
 
 export interface RouterQuotaData {
   online: boolean;
   serverUrl: string;
-  lastUpdated: string;
   connections: ProviderConnection[];
+  initialUsage?: UsageStreamData;
+  topologyProviders?: TopologyProvider[];
+  initialChartData?: ChartDataPoint[];
 }
 
 export class DataProvider {
   private static instance: DataProvider;
+
+  private constructor() {}
 
   public static getInstance(): DataProvider {
     if (!DataProvider.instance) {
@@ -48,24 +79,51 @@ export class DataProvider {
   }
 
   private getJwtToken(): string | null {
+    const customKey = vscode.workspace.getConfiguration('9router').get<string>('apiKey');
+    if (customKey && customKey.trim().length > 0) {
+      return customKey.trim();
+    }
+
+    const secretPath = path.join(os.homedir(), '.9router', 'jwt-secret');
+    if (!fs.existsSync(secretPath)) {
+      return null;
+    }
+
     try {
-      const secretPath = path.join(os.homedir(), '.9router', 'jwt-secret');
-      if (!fs.existsSync(secretPath)) {
-        return null;
-      }
       const secret = fs.readFileSync(secretPath, 'utf8').trim();
+      if (!secret) return null;
+
       const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
       const payload = Buffer.from(
         JSON.stringify({
           authenticated: true,
           iat: Math.floor(Date.now() / 1000),
-          exp: Math.floor(Date.now() / 1000) + 86400
+          exp: Math.floor(Date.now() / 1000) + 86400 * 30
         })
       ).toString('base64url');
-      const sig = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
-      return `${header}.${payload}.${sig}`;
-    } catch {
+      const unsigned = `${header}.${payload}`;
+
+      const sig = crypto.createHmac('sha256', secret).update(unsigned).digest('base64url');
+      return `${unsigned}.${sig}`;
+    } catch (err) {
+      console.warn('[9Router] Error generating JWT token:', err);
       return null;
+    }
+  }
+
+  public async fetchChartData(period: string = 'today'): Promise<ChartDataPoint[]> {
+    const config = vscode.workspace.getConfiguration('9router');
+    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
+    const token = this.getJwtToken();
+
+    try {
+      const res = await this.httpRequest(`${baseUrl}/api/usage/chart?period=${period}`, token);
+      if (res.ok && Array.isArray(res.data)) {
+        return res.data;
+      }
+      return [];
+    } catch {
+      return [];
     }
   }
 
@@ -75,78 +133,228 @@ export class DataProvider {
     const token = this.getJwtToken();
 
     try {
-      // 1. Fetch provider connections
-      const providersResp = await this.httpGet(`${baseUrl}/api/providers`, token);
-      if (!providersResp || !providersResp.connections) {
-        throw new Error('Failed to fetch providers');
+      const providersUrl = `${baseUrl}/api/providers`;
+      const res = await this.httpRequest(providersUrl, token);
+
+      if (!res.ok || !res.data || !Array.isArray(res.data.connections)) {
+        return {
+          online: false,
+          serverUrl: baseUrl,
+          connections: [],
+          topologyProviders: [],
+          initialChartData: []
+        };
       }
 
-      const rawConnections: any[] = providersResp.connections;
+      const rawConnections: any[] = res.data.connections;
       const connections: ProviderConnection[] = [];
+      const seenProv = new Set<string>();
+      const topoProviders: TopologyProvider[] = [];
 
-      // 2. Fetch quota for each connection in parallel
+      // Fetch usage and quotas for each connection in parallel
       await Promise.all(
         rawConnections.map(async (c) => {
           let quotas: QuotaItem[] = [];
-          let plan = c.provider;
-          let status: 'active' | 'online' | 'error' | 'idle' = c.isActive ? 'online' : 'idle';
-          let errorMsg = '';
+          let rawQuotas: Record<string, any> = {};
 
           try {
-            const usageData = await this.httpGet(`${baseUrl}/api/usage/${c.id}`, token);
-            if (usageData) {
-              if (usageData.plan) {
-                plan = usageData.plan;
-              }
-              quotas = this.parseAndCurateQuotas(c.provider, usageData);
+            const usageRes = await this.httpRequest(`${baseUrl}/api/usage/${c.id}`, token);
+            if (usageRes.ok && usageRes.data) {
+              quotas = this.parseAndCurateQuotas(c.provider, usageRes.data);
+              rawQuotas = usageRes.data.quotas || {};
             }
-          } catch (err: any) {
-            errorMsg = err.message || 'Failed to fetch usage';
-          }
+          } catch (e) {}
 
           connections.push({
             id: c.id,
-            provider: c.provider,
-            name: c.name || c.email || c.provider,
-            email: c.email || (c.name?.includes('@') ? c.name : undefined),
-            priority: c.priority || 1,
-            isActive: !!c.isActive,
-            status: c.isActive ? 'active' : 'idle',
-            plan,
+            name: c.name || c.email || 'Default',
+            provider: c.provider || 'unknown',
+            email: c.email || (c.name && c.name.includes('@') ? c.name : undefined),
+            priority: c.priority ?? 1,
+            isActive: c.isActive !== false,
+            status: c.status || (c.isActive ? 'active' : 'idle'),
             quotas,
-            lastRefresh: new Date().toLocaleTimeString(),
-            error: errorMsg || undefined
+            rawQuotas
           });
+
+          // Add to topology providers if active and not seen yet
+          if (c.isActive !== false && !seenProv.has(c.provider)) {
+            seenProv.add(c.provider);
+            topoProviders.push({
+              provider: c.provider,
+              name: this.formatProviderName(c.provider)
+            });
+          }
         })
       );
 
-      // Sort connections by priority asc, then active
-      connections.sort((a, b) => {
-        if (a.isActive && !b.isActive) return -1;
-        if (!a.isActive && b.isActive) return 1;
-        return a.priority - b.priority;
+      // Append free noAuth providers (OpenCode, MiMo) if not present
+      const freeNoAuth = [
+        { provider: 'opencode', name: 'OpenCode Free' },
+        { provider: 'mimo', name: 'MiMo Code Free' }
+      ];
+      freeNoAuth.forEach(fp => {
+        if (!seenProv.has(fp.provider)) {
+          seenProv.add(fp.provider);
+          topoProviders.push(fp);
+        }
       });
+
+      // Sort connections by priority
+      connections.sort((a, b) => a.priority - b.priority);
+
+      // Fetch initial usage stats & initial chart
+      let initialUsage: UsageStreamData | undefined;
+      let initialChartData: ChartDataPoint[] = [];
+
+      try {
+        const [statsRes, chartRes] = await Promise.all([
+          this.httpRequest(`${baseUrl}/api/usage/stats?period=today`, token),
+          this.httpRequest(`${baseUrl}/api/usage/chart?period=today`, token)
+        ]);
+
+        if (statsRes.ok && statsRes.data) {
+          initialUsage = {
+            totalRequests: statsRes.data.totalRequests || 0,
+            totalPromptTokens: statsRes.data.totalPromptTokens || 0,
+            totalCompletionTokens: statsRes.data.totalCompletionTokens || 0,
+            activeRequests: statsRes.data.activeRequests || [],
+            recentRequests: statsRes.data.recentRequests || [],
+            byProvider: statsRes.data.byProvider || {},
+            lastUpdated: new Date().toLocaleTimeString()
+          };
+        }
+
+        if (chartRes.ok && Array.isArray(chartRes.data)) {
+          initialChartData = chartRes.data;
+        }
+      } catch (e) {}
 
       return {
         online: true,
         serverUrl: baseUrl,
-        lastUpdated: new Date().toLocaleTimeString(),
-        connections
+        connections,
+        initialUsage,
+        topologyProviders: topoProviders,
+        initialChartData
       };
-    } catch (err) {
-      console.warn('[9Router] Error fetching quotas from API:', err);
+    } catch (err: any) {
+      console.warn('[9Router] Error fetching quotas from API:', err.message);
       return {
         online: false,
         serverUrl: baseUrl,
-        lastUpdated: new Date().toLocaleTimeString(),
-        connections: []
+        connections: [],
+        topologyProviders: [],
+        initialChartData: []
       };
     }
   }
 
-  /**
-   * Exact 1:1 Curation algorithm used in 9Router's official dashboard
-   */
+  public async toggleConnection(connectionId: string, nextActive: boolean): Promise<boolean> {
+    const config = vscode.workspace.getConfiguration('9router');
+    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
+    const token = this.getJwtToken();
+
+    try {
+      const url = `${baseUrl}/api/providers/${connectionId}`;
+      const res = await this.httpRequest(url, token, 'PATCH', { isActive: nextActive });
+      return res.ok;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  public async testConnection(connectionId: string): Promise<{ valid: boolean; error?: string }> {
+    const config = vscode.workspace.getConfiguration('9router');
+    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
+    const token = this.getJwtToken();
+
+    try {
+      const url = `${baseUrl}/api/providers/${connectionId}/test`;
+      const res = await this.httpRequest(url, token, 'POST', {});
+      if (res.ok && res.data) {
+        return {
+          valid: res.data.valid !== false,
+          error: res.data.error
+        };
+      }
+      return { valid: false, error: res.error || 'Test failed' };
+    } catch (err: any) {
+      return { valid: false, error: err.message };
+    }
+  }
+
+  public listenUsageStream(onData: (data: UsageStreamData) => void): () => void {
+    const config = vscode.workspace.getConfiguration('9router');
+    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
+    const token = this.getJwtToken();
+
+    let isClosed = false;
+    let req: http.ClientRequest | null = null;
+
+    try {
+      const url = new URL(`${baseUrl}/api/usage/stream`);
+      const reqModule = url.protocol === 'https:' ? https : http;
+      const headers: Record<string, string> = {
+        Accept: 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive'
+      };
+      if (token) {
+        headers['Cookie'] = `auth_token=${token}`;
+      }
+
+      req = reqModule.get(url.toString(), { headers, timeout: 0 }, (res) => {
+        let buffer = '';
+        res.on('data', (chunk) => {
+          if (isClosed) return;
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const parsed = JSON.parse(trimmed.slice(6));
+                onData({
+                  totalRequests: parsed.totalRequests || 0,
+                  totalPromptTokens: parsed.totalPromptTokens || 0,
+                  totalCompletionTokens: parsed.totalCompletionTokens || 0,
+                  activeRequests: parsed.activeRequests || [],
+                  recentRequests: parsed.recentRequests || [],
+                  byProvider: parsed.byProvider || {},
+                  lastUpdated: new Date().toLocaleTimeString()
+                });
+              } catch (e) {}
+            }
+          }
+        });
+
+        res.on('end', () => {
+          if (!isClosed) {
+            setTimeout(() => this.listenUsageStream(onData), 5000);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        if (!isClosed) {
+          console.warn('[9Router] SSE stream connection error:', err.message);
+        }
+      });
+    } catch (err: any) {
+      console.warn('[9Router] Error starting SSE stream listener:', err.message);
+    }
+
+    return () => {
+      isClosed = true;
+      if (req) {
+        req.destroy();
+      }
+    };
+  }
+
   private parseAndCurateQuotas(provider: string, usageData: any): QuotaItem[] {
     if (!usageData || !usageData.quotas || typeof usageData.quotas !== 'object') {
       return [];
@@ -167,258 +375,195 @@ export class DataProvider {
         ([k]) => !k.startsWith('gemini-') && !k.startsWith('claude-') && !k.includes('image') && !weeklyKeys.has(k)
       );
 
-      // 1. Gemini (Flash / Pro) - Pick lowest remaining percentage
       if (geminiModels.length > 0) {
-        const lowest = geminiModels.reduce((min, cur) =>
-          (cur[1].remainingPercentage ?? 100) < (min[1].remainingPercentage ?? 100) ? cur : min
-        )[1];
-        result.push({
-          id: 'gemini',
-          displayName: 'Gemini (Flash / Pro)',
-          used: lowest.used || 0,
-          total: lowest.total || 1000,
-          resetAt: lowest.resetAt || null,
-          remainingPercentage: lowest.remainingPercentage ?? (100 - ((lowest.used || 0) / (lowest.total || 1000)) * 100)
-        });
+        result.push(this.aggregateBucket('gemini_flash_pro', 'Gemini (Flash / Pro)', geminiModels.map(([, v]) => v)));
       }
-
-      // 2. Claude (Sonnet / Opus) - Pick lowest remaining percentage
       if (claudeModels.length > 0) {
-        const lowest = claudeModels.reduce((min, cur) =>
-          (cur[1].remainingPercentage ?? 100) < (min[1].remainingPercentage ?? 100) ? cur : min
-        )[1];
-        result.push({
-          id: 'claude',
-          displayName: 'Claude (Sonnet / Opus)',
-          used: lowest.used || 0,
-          total: lowest.total || 1000,
-          resetAt: lowest.resetAt || null,
-          remainingPercentage: lowest.remainingPercentage ?? (100 - ((lowest.used || 0) / (lowest.total || 1000)) * 100)
-        });
+        result.push(this.aggregateBucket('claude_sonnet_opus', 'Claude (Sonnet / Opus)', claudeModels.map(([, v]) => v)));
       }
-
-      // 3. GPT-OSS 120B & Other models
-      otherModels.forEach(([k, val]) => {
-        result.push({
-          id: k,
-          displayName: val.displayName || k,
-          used: val.used || 0,
-          total: val.total || 1000,
-          resetAt: val.resetAt || null,
-          remainingPercentage: val.remainingPercentage ?? (100 - ((val.used || 0) / (val.total || 1000)) * 100)
-        });
+      otherModels.forEach(([k, v]) => {
+        result.push(this.formatSingleQuota(k, v));
       });
-
-      // 4. Gemini 3.1 Flash Image
-      imageModels.forEach(([k, val]) => {
-        result.push({
-          id: k,
-          displayName: val.displayName || k,
-          used: val.used || 0,
-          total: val.total || 1000,
-          resetAt: val.resetAt || null,
-          remainingPercentage: val.remainingPercentage ?? (100 - ((val.used || 0) / (val.total || 1000)) * 100)
-        });
-      });
-
-      // 5. Weekly quotas (Gemini Weekly, Claude & GPT Weekly)
-      weeklyModels.forEach(([k, val]) => {
-        result.push({
-          id: k,
-          displayName: val.displayName || k,
-          used: val.used || 0,
-          total: val.total || 1000,
-          resetAt: val.resetAt || null,
-          remainingPercentage: val.remainingPercentage ?? (100 - ((val.used || 0) / (val.total || 1000)) * 100)
-        });
+      if (imageModels.length > 0) {
+        result.push(this.aggregateBucket('gemini_image', 'Gemini 3.1 Flash Image', imageModels.map(([, v]) => v)));
+      }
+      weeklyModels.forEach(([k, v]) => {
+        result.push(this.formatSingleQuota(k, v));
       });
 
       return result;
-    }
-
-    if (p === 'claude') {
-      const order: Record<string, number> = {
-        'session (5h)': 0,
-        'weekly (7d)': 1,
-        'weekly fable (7d)': 2,
-        'weekly opus (7d)': 3,
-        'weekly sonnet (7d)': 4
-      };
-
-      for (const [key, val] of Object.entries<any>(rawQuotas)) {
-        result.push({
-          id: key,
-          displayName: key,
-          used: val.used || 0,
-          total: val.total || 100,
-          resetAt: val.resetAt || null,
-          remainingPercentage: val.remainingPercentage ?? (100 - ((val.used || 0) / (val.total || 100)) * 100)
-        });
-      }
-
-      result.sort((a, b) => (order[a.displayName] ?? 99) - (order[b.displayName] ?? 99));
-      return result;
-    }
-
-    // Default / DeepSeek / Azure / etc.
-    if (Array.isArray(rawQuotas)) {
-      return rawQuotas.map((q: any) => ({
-        id: q.name || q.id || 'quota',
-        displayName: q.displayName || q.name || 'Quota',
-        used: q.used || 0,
-        total: q.total || 1000,
-        resetAt: q.resetAt || null,
-        remainingPercentage: q.remainingPercentage ?? (100 - ((q.used || 0) / (q.total || 1000)) * 100),
-        unlimited: !!q.unlimited
-      }));
     }
 
     for (const [key, val] of Object.entries<any>(rawQuotas)) {
-      result.push({
-        id: key,
-        displayName: val.displayName || key,
-        used: val.used ?? 0,
-        total: val.total ?? 1000,
-        resetAt: val.resetAt || null,
-        remainingPercentage: val.remainingPercentage ?? (100 - ((val.used || 0) / (val.total || 1000)) * 100),
-        unlimited: !!val.unlimited
-      });
+      result.push(this.formatSingleQuota(key, val));
     }
 
     return result;
   }
 
-  public async testConnection(connectionId: string): Promise<{ valid: boolean; error?: string }> {
-    const config = vscode.workspace.getConfiguration('9router');
-    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
-
-    try {
-      const res = await this.httpPost(`${baseUrl}/api/providers/${connectionId}/test`, {}, token);
-      return { valid: !!res?.valid, error: res?.error };
-    } catch (err: any) {
-      return { valid: false, error: err.message };
+  private aggregateBucket(bucketKey: string, displayName: string, items: any[]): QuotaItem {
+    if (!items || items.length === 0) {
+      return {
+        name: bucketKey,
+        displayName,
+        used: 0,
+        total: 1000,
+        unlimited: false,
+        remainingPercentage: 100
+      };
     }
+
+    let totalUsed = 0;
+    let totalLimit = 0;
+    let minRemainingPct = 100;
+    let earliestReset: string | undefined;
+
+    items.forEach(item => {
+      const u = typeof item.used === 'number' ? item.used : 0;
+      const t = typeof item.total === 'number' ? item.total : (typeof item.limit === 'number' ? item.limit : 1000);
+      const pct = typeof item.remainingPercentage === 'number' ? item.remainingPercentage : (t > 0 ? ((t - u) / t) * 100 : 100);
+
+      totalUsed += u;
+      totalLimit += t;
+      if (pct < minRemainingPct) minRemainingPct = pct;
+
+      const resetStr = item.resetAt || item.resetsAt;
+      if (resetStr) {
+        if (!earliestReset || new Date(resetStr) < new Date(earliestReset)) {
+          earliestReset = resetStr;
+        }
+      }
+    });
+
+    const avgUsed = Math.round(totalUsed / items.length);
+    const avgLimit = Math.round(totalLimit / items.length) || 1000;
+
+    return {
+      name: bucketKey,
+      displayName,
+      used: avgUsed,
+      total: avgLimit,
+      unlimited: false,
+      remainingPercentage: minRemainingPct,
+      resetAt: earliestReset
+    };
   }
 
-  public async toggleConnection(connectionId: string, isActive: boolean): Promise<boolean> {
-    const config = vscode.workspace.getConfiguration('9router');
-    const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+  private formatSingleQuota(rawKey: string, item: any): QuotaItem {
+    const used = typeof item.used === 'number' ? item.used : (typeof item.count === 'number' ? item.count : 0);
+    const total = typeof item.total === 'number' ? item.total : (typeof item.limit === 'number' ? item.limit : 1000);
+    const unlimited = !!item.unlimited || total >= 999999;
+    const remainingPercentage = typeof item.remainingPercentage === 'number'
+      ? item.remainingPercentage
+      : (total > 0 ? Math.max(0, ((total - used) / total) * 100) : 100);
 
-    try {
-      const res = await this.httpPut(`${baseUrl}/api/providers/${connectionId}`, { isActive }, token);
-      return !!res;
-    } catch {
-      return false;
+    let displayName = rawKey;
+    if (rawKey === 'gemini_weekly') displayName = 'Gemini (Weekly)';
+    else if (rawKey === 'claude_gpt_weekly') displayName = 'Claude & GPT (Weekly)';
+    else if (rawKey.includes('120b')) displayName = 'GPT-OSS 120B';
+    else if (rawKey.includes('flash-image')) displayName = 'Gemini 3.1 Flash Image';
+    else {
+      displayName = rawKey
+        .replace(/[_-]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
     }
+
+    return {
+      name: rawKey,
+      displayName,
+      used,
+      total,
+      unlimited,
+      remainingPercentage,
+      resetAt: item.resetAt || item.resetsAt
+    };
   }
 
-  private httpGet(urlStr: string, token: string | null): Promise<any> {
-    return new Promise((resolve, reject) => {
+  private formatProviderName(provider: string): string {
+    const p = (provider || '').toLowerCase();
+    if (p === 'antigravity') return 'Antigravity';
+    if (p === 'claude') return 'Claude Code';
+    if (p === 'deepseek') return 'DeepSeek';
+    if (p === 'azure') return 'Azure OpenAI';
+    if (p === 'kiro') return 'Kiro AI';
+    if (p === 'codex') return 'Codex';
+    if (p === 'mimo') return 'MiMo Code Free';
+    if (p === 'opencode') return 'OpenCode Free';
+    return provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Provider';
+  }
+
+  private httpRequest(
+    urlStr: string,
+    token: string | null,
+    method: string = 'GET',
+    bodyData?: any
+  ): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
+    return new Promise((resolve) => {
       try {
-        const url = new URL(urlStr);
-        const reqModule = url.protocol === 'https:' ? https : http;
-        const headers: Record<string, string> = {};
+        const parsed = new URL(urlStr);
+        const reqModule = parsed.protocol === 'https:' ? https : http;
+
+        const headers: Record<string, string> = {
+          Accept: 'application/json',
+          'User-Agent': '9Router-VSCode-Monitor'
+        };
+
         if (token) {
           headers['Cookie'] = `auth_token=${token}`;
+          headers['Authorization'] = `Bearer ${token}`;
         }
-        const req = reqModule.get(urlStr, { headers, timeout: 4000 }, (res) => {
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
-          res.on('end', () => {
-            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+
+        let bodyPayload = '';
+        if (bodyData !== undefined) {
+          bodyPayload = JSON.stringify(bodyData);
+          headers['Content-Type'] = 'application/json';
+          headers['Content-Length'] = String(Buffer.byteLength(bodyPayload));
+        }
+
+        const req = reqModule.request(
+          parsed.toString(),
+          {
+            method,
+            headers,
+            timeout: 8000
+          },
+          (res) => {
+            let resData = '';
+            res.on('data', (c) => (resData += c));
+            res.on('end', () => {
               try {
-                resolve(JSON.parse(data));
-              } catch {
-                resolve(data);
+                const parsedJson = resData ? JSON.parse(resData) : null;
+                resolve({
+                  ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
+                  status: res.statusCode || 0,
+                  data: parsedJson
+                });
+              } catch (e) {
+                resolve({
+                  ok: (res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300,
+                  status: res.statusCode || 0,
+                  data: resData
+                });
               }
-            } else {
-              reject(new Error(`HTTP ${res.statusCode}: ${data}`));
-            }
-          });
+            });
+          }
+        );
+
+        req.on('error', (err) => {
+          resolve({ ok: false, status: 0, error: err.message });
         });
-        req.on('error', reject);
+
         req.on('timeout', () => {
           req.destroy();
-          reject(new Error('Request timeout'));
+          resolve({ ok: false, status: 408, error: 'Request timed out' });
         });
-      } catch (e) {
-        reject(e);
-      }
-    });
-  }
 
-  private httpPost(urlStr: string, body: any, token: string | null): Promise<any> {
-    return new Promise((resolve, reject) => {
-      try {
-        const url = new URL(urlStr);
-        const reqModule = url.protocol === 'https:' ? https : http;
-        const dataStr = JSON.stringify(body);
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(dataStr))
-        };
-        if (token) {
-          headers['Cookie'] = `auth_token=${token}`;
+        if (bodyPayload) {
+          req.write(bodyPayload);
         }
-        const req = reqModule.request(
-          urlStr,
-          { method: 'POST', headers, timeout: 6000 },
-          (res) => {
-            let data = '';
-            res.on('data', (chunk) => (data += chunk));
-            res.on('end', () => {
-              try {
-                resolve(JSON.parse(data));
-              } catch {
-                resolve(data);
-              }
-            });
-          }
-        );
-        req.on('error', reject);
-        req.write(dataStr);
         req.end();
-      } catch (e) {
-        reject(e);
-      }
-    });
-  }
-
-  private httpPut(urlStr: string, body: any, token: string | null): Promise<any> {
-    return new Promise((resolve, reject) => {
-      try {
-        const url = new URL(urlStr);
-        const reqModule = url.protocol === 'https:' ? https : http;
-        const dataStr = JSON.stringify(body);
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Content-Length': String(Buffer.byteLength(dataStr))
-        };
-        if (token) {
-          headers['Cookie'] = `auth_token=${token}`;
-        }
-        const req = reqModule.request(
-          urlStr,
-          { method: 'PUT', headers, timeout: 6000 },
-          (res) => {
-            let data = '';
-            res.on('data', (chunk) => (data += chunk));
-            res.on('end', () => {
-              try {
-                resolve(JSON.parse(data));
-              } catch {
-                resolve(data);
-              }
-            });
-          }
-        );
-        req.on('error', reject);
-        req.write(dataStr);
-        req.end();
-      } catch (e) {
-        reject(e);
+      } catch (err: any) {
+        resolve({ ok: false, status: 0, error: err.message });
       }
     });
   }

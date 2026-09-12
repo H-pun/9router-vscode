@@ -1,15 +1,51 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
-const vscode = require("vscode");
+const vscode = __importStar(require("vscode"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const os = __importStar(require("os"));
 const dataProvider_1 = require("./dataProvider");
 const quotaWebviewProvider_1 = require("./quotaWebviewProvider");
 let statusBarItem;
 let refreshTimer;
 function activate(context) {
     console.log('[9Router Monitor] Extension activated');
-    // 1. Register Single Clean Quota Tracker Webview Provider
+    // 1. Single Native View with Split Drag Layout
     const quotaWebviewProvider = new quotaWebviewProvider_1.QuotaWebviewProvider(context.extensionUri);
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(quotaWebviewProvider_1.QuotaWebviewProvider.viewType, quotaWebviewProvider));
     // 2. Status Bar Item
@@ -22,7 +58,7 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('9router.refreshStats', async () => {
         await quotaWebviewProvider.refresh();
         await updateStatusBar();
-        vscode.window.showInformationMessage('9Router: Quotas refreshed');
+        vscode.window.showInformationMessage('9Router: Refreshed');
     }));
     // Settings Configuration Wizard
     context.subscriptions.push(vscode.commands.registerCommand('9router.configureSettings', async () => {
@@ -94,16 +130,42 @@ function activate(context) {
             vscode.commands.executeCommand('workbench.action.openSettings', '9router');
         }
     }));
-    // 4. Initial fetch & timer setup (15 mins default)
+    // 4. Hot-Reload Trigger Watcher (Auto-reload VS Code on touch ~/.9router/reload-trigger)
+    setupAutoReloadTrigger(context);
+    // 5. Initial fetch & timer setup (15 mins default)
     updateStatusBar();
     startPolling(context, quotaWebviewProvider);
-    // 5. Watch configuration changes
+    // 6. Watch configuration changes
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('9router')) {
             startPolling(context, quotaWebviewProvider);
             updateStatusBar();
         }
     }));
+}
+function setupAutoReloadTrigger(context) {
+    const triggerDir = path.join(os.homedir(), '.9router');
+    const triggerFile = path.join(triggerDir, 'reload-trigger');
+    try {
+        if (!fs.existsSync(triggerDir)) {
+            fs.mkdirSync(triggerDir, { recursive: true });
+        }
+        if (!fs.existsSync(triggerFile)) {
+            fs.writeFileSync(triggerFile, String(Date.now()));
+        }
+        fs.watchFile(triggerFile, { interval: 300 }, () => {
+            console.log('[9Router Monitor] Auto-reload triggered');
+            vscode.commands.executeCommand('workbench.action.reloadWindow');
+        });
+        context.subscriptions.push({
+            dispose: () => {
+                fs.unwatchFile(triggerFile);
+            }
+        });
+    }
+    catch (err) {
+        console.warn('[9Router] Could not setup reload trigger watcher:', err);
+    }
 }
 function startPolling(context, quotaWebviewProvider) {
     if (refreshTimer) {

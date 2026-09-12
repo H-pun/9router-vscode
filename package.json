@@ -2,8 +2,13 @@
   "name": "9router-vscode-monitor",
   "displayName": "9Router (VS Code)",
   "description": "Native VS Code Quota Tracker & Usage Monitor for 9Router",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "publisher": "harpun",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/H-pun/9router-vscode.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -33,11 +38,6 @@
       ]
     },
     "commands": [
-      {
-        "command": "9router.refreshStats",
-        "title": "Refresh All Quotas",
-        "icon": "$(refresh)"
-      },
       {
         "command": "9router.configureSettings",
         "title": "Configure 9Router Settings",
@@ -93,12 +93,18 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
     "@types/vscode": "^1.85.0",
+    "@vscode/codicons": "^0.0.36",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.25.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@vscode/codicons": "^0.0.46-24"
+    "@xyflow/react": "^12.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.1"
   }
 }
