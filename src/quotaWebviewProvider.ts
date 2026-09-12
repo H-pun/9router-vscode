@@ -41,6 +41,11 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
             });
             vscode.window.showErrorMessage('9Router: Failed to update connection state. Rolled back.');
           } else {
+            webviewView.webview.postMessage({
+              type: 'toggleResult',
+              connectionId: data.connectionId,
+              success: true
+            });
             await this.refresh();
           }
           break;

@@ -232,6 +232,13 @@ export function getQuotaWebviewHtml(
       cursor: pointer;
       padding: 2px;
       margin-left: 2px;
+      transition: opacity 0.15s ease;
+    }
+
+    .toggle-switch-box.disabled {
+      opacity: 0.45;
+      pointer-events: none;
+      cursor: wait;
     }
 
     .toggle-track {
@@ -393,6 +400,7 @@ export function getQuotaWebviewHtml(
     let currentFilter = '${initialFilter}';
     const groupCollapseMap = {};
     const accountCollapseMap = {};
+    const inFlightMap = {};
 
     connections.forEach(c => {
       if (accountCollapseMap[c.id] === undefined) {
@@ -544,7 +552,7 @@ export function getQuotaWebviewHtml(
                   </button>
 
                   <!-- Native-style ON/OFF Toggle Switch -->
-                  <div class="toggle-switch-box" onclick="toggleActive('\${c.id}', \${!c.isActive})" title="\${c.isActive ? 'Active (Click to Turn OFF)' : 'Idle (Click to Turn ON)'}">
+                  <div class="toggle-switch-box \${inFlightMap[c.id] ? 'disabled' : ''}" id="toggle-box-\${c.id}" onclick="toggleActive('\${c.id}', \${!c.isActive})" title="\${inFlightMap[c.id] ? 'Updating...' : (c.isActive ? 'Active (Click to Turn OFF)' : 'Idle (Click to Turn ON)')}">
                     <div class="toggle-track \${c.isActive ? 'active' : ''}">
                       <div class="toggle-thumb"></div>
                     </div>
@@ -616,12 +624,15 @@ export function getQuotaWebviewHtml(
     }
 
     function toggleActive(id, nextActive) {
-      const conn = rawConnections.find(c => c.id === id);
+      if (inFlightMap[id]) return;
+
+      const conn = connections.find(c => c.id === id);
       if (!conn) return;
 
       const prevActive = conn.isActive;
-      // 1. Optimistic Update: Immediately flip visual state locally
+      // 1. Optimistic Update: Immediately flip visual state & mark in-flight disabled
       conn.isActive = nextActive;
+      inFlightMap[id] = true;
       renderGroupedTree();
 
       // 2. Send command to extension host with rollback context
@@ -638,8 +649,16 @@ export function getQuotaWebviewHtml(
       const msg = event.data;
       if (!msg) return;
 
-      if (msg.type === 'toggleRollback') {
-        const conn = rawConnections.find(c => c.id === msg.connectionId);
+      if (msg.type === 'toggleResult') {
+        delete inFlightMap[msg.connectionId];
+        const conn = connections.find(c => c.id === msg.connectionId);
+        if (conn && msg.success === false) {
+          conn.isActive = msg.prevActive;
+        }
+        renderGroupedTree();
+      } else if (msg.type === 'toggleRollback') {
+        delete inFlightMap[msg.connectionId];
+        const conn = connections.find(c => c.id === msg.connectionId);
         if (conn) {
           conn.isActive = msg.prevActive;
           renderGroupedTree();
