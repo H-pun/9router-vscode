@@ -5,11 +5,18 @@ import * as os from 'os';
 import { DataProvider } from './dataProvider';
 import { QuotaWebviewProvider } from './quotaWebviewProvider';
 import { UsageWebviewProvider } from './usageWebviewProvider';
+import { migrateApiKey, SECRET_KEY } from './secretMigration';
 
 let refreshTimer: NodeJS.Timeout | undefined;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('[9Router Monitor] Extension activated');
+
+  // Initialize SecretStorage on DataProvider
+  DataProvider.getInstance().setSecretStorage(context.secrets);
+
+  // Migrate legacy configuration apiKey to SecretStorage if present
+  await migrateApiKey(context);
 
   // 1. Register Native Views (Official VS Code ViewPanes)
   const quotaWebviewProvider = new QuotaWebviewProvider(context.extensionUri);
@@ -50,10 +57,32 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Settings GUI
+  // Settings Wizard using SecretStorage for apiKey
   context.subscriptions.push(
-    vscode.commands.registerCommand('9router.configureSettings', () => {
-      vscode.commands.executeCommand('workbench.action.openSettings', '9router');
+    vscode.commands.registerCommand('9router.configureSettings', async () => {
+      const current = await context.secrets.get(SECRET_KEY);
+
+      const key = await vscode.window.showInputBox({
+        prompt: 'API Key 9Router',
+        password: true,
+        ignoreFocusOut: true,
+        placeHolder: current
+          ? 'Key sudah tersimpan — isi untuk mengganti, kosongkan untuk menghapus'
+          : 'Kosongkan bila akses lokal tanpa auth',
+      });
+
+      if (key === undefined) return; // User pressed Esc
+
+      if (key.trim() === '') {
+        await context.secrets.delete(SECRET_KEY);
+        vscode.window.showInformationMessage('9Router: API key dihapus dari penyimpanan aman.');
+      } else {
+        await context.secrets.store(SECRET_KEY, key.trim());
+        vscode.window.showInformationMessage('9Router: API key berhasil disimpan ke Secret Storage.');
+      }
+
+      await quotaWebviewProvider.refresh();
+      await usageWebviewProvider.render();
     })
   );
 
@@ -63,6 +92,16 @@ export function activate(context: vscode.ExtensionContext) {
       const config = vscode.workspace.getConfiguration('9router');
       const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128');
       vscode.env.openExternal(vscode.Uri.parse(baseUrl));
+    })
+  );
+
+  // Reactive to SecretStorage changes
+  context.subscriptions.push(
+    context.secrets.onDidChange(async (e) => {
+      if (e.key === SECRET_KEY) {
+        await quotaWebviewProvider.refresh();
+        await usageWebviewProvider.render();
+      }
     })
   );
 

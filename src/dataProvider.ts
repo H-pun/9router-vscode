@@ -68,6 +68,7 @@ export interface RouterQuotaData {
 
 export class DataProvider {
   private static instance: DataProvider;
+  private secrets?: vscode.SecretStorage;
 
   private constructor() {}
 
@@ -78,10 +79,21 @@ export class DataProvider {
     return DataProvider.instance;
   }
 
-  private getJwtToken(): string | null {
-    const customKey = vscode.workspace.getConfiguration('9router').get<string>('apiKey');
-    if (customKey && customKey.trim().length > 0) {
-      return customKey.trim();
+  public setSecretStorage(secrets: vscode.SecretStorage): void {
+    this.secrets = secrets;
+  }
+
+  private async getJwtToken(): Promise<string | null> {
+    if (this.secrets) {
+      const secretKey = await this.secrets.get('9router.apiKey');
+      if (secretKey && secretKey.trim().length > 0) {
+        return secretKey.trim();
+      }
+    }
+
+    const legacyKey = vscode.workspace.getConfiguration('9router').get<string>('apiKey');
+    if (legacyKey && legacyKey.trim().length > 0) {
+      return legacyKey.trim();
     }
 
     const secretPath = path.join(os.homedir(), '.9router', 'jwt-secret');
@@ -114,7 +126,7 @@ export class DataProvider {
   public async fetchChartData(period: string = 'today'): Promise<ChartDataPoint[]> {
     const config = vscode.workspace.getConfiguration('9router');
     const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+    const token = await this.getJwtToken();
 
     try {
       const res = await this.httpRequest(`${baseUrl}/api/usage/chart?period=${period}`, token);
@@ -130,7 +142,7 @@ export class DataProvider {
   public async fetchQuotas(): Promise<RouterQuotaData> {
     const config = vscode.workspace.getConfiguration('9router');
     const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+    const token = await this.getJwtToken();
 
     try {
       const providersUrl = `${baseUrl}/api/providers`;
@@ -253,7 +265,7 @@ export class DataProvider {
   public async toggleConnection(connectionId: string, nextActive: boolean): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('9router');
     const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+    const token = await this.getJwtToken();
 
     try {
       const url = `${baseUrl}/api/providers/${connectionId}`;
@@ -267,7 +279,7 @@ export class DataProvider {
   public async testConnection(connectionId: string): Promise<{ valid: boolean; error?: string }> {
     const config = vscode.workspace.getConfiguration('9router');
     const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+    const token = await this.getJwtToken();
 
     try {
       const url = `${baseUrl}/api/providers/${connectionId}/test`;
@@ -284,10 +296,10 @@ export class DataProvider {
     }
   }
 
-  public listenUsageStream(onData: (data: UsageStreamData) => void): () => void {
+  public async listenUsageStream(onData: (data: UsageStreamData) => void): Promise<() => void> {
     const config = vscode.workspace.getConfiguration('9router');
     const baseUrl = config.get<string>('baseUrl', 'http://localhost:20128').replace(/\/+$/, '');
-    const token = this.getJwtToken();
+    const token = await this.getJwtToken();
 
     let isClosed = false;
     let req: http.ClientRequest | null = null;

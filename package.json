@@ -118,7 +118,8 @@
         "9router.apiKey": {
           "type": "string",
           "default": "",
-          "description": "API Key for authenticating with 9Router (leave blank for local direct access)"
+          "markdownDeprecationMessage": "**Deprecated.** API key sekarang disimpan di Secret Storage VS Code. Jalankan command **Configure 9Router Settings** untuk memindahkannya.",
+          "description": "(Deprecated) API Key untuk autentikasi ke 9Router."
         },
         "9router.refreshInterval": {
           "type": "number",

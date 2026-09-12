@@ -45,12 +45,12 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private startLiveStream() {
+  private async startLiveStream() {
     if (this._streamDisposer) {
       this._streamDisposer();
     }
 
-    this._streamDisposer = DataProvider.getInstance().listenUsageStream((streamData: UsageStreamData) => {
+    this._streamDisposer = await DataProvider.getInstance().listenUsageStream((streamData: UsageStreamData) => {
       if (this._view) {
         this._view.webview.postMessage({
           type: 'usageStream',
