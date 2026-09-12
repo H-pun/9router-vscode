@@ -59,7 +59,7 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
               success: false,
               prevPeriod: data.prevPeriod
             });
-            vscode.window.showErrorMessage('9Router: Failed to load chart data. Rolled back.');
+            vscode.window.showErrorMessage('9Router: Failed to load chart data.');
           }
           break;
         case 'ready':

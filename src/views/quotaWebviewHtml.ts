@@ -542,7 +542,7 @@ export function getQuotaWebviewHtml(
 
                 <div class="account-actions">
                   <!-- Manual Refresh -->
-                  <button class="icon-btn" onclick="refreshSingle('\${c.id}', '\${profileName}')" title="Refresh Quota for \${profileName}">
+                  <button class="icon-btn" id="refresh-btn-\${c.id}" onclick="refreshSingle('\${c.id}', '\${profileName}')" title="Refresh Quota for \${profileName}">
                     <i class="codicon codicon-refresh"></i>
                   </button>
 
@@ -616,10 +616,20 @@ export function getQuotaWebviewHtml(
     }
 
     function refreshSingle(id, name) {
+      const btn = document.getElementById('refresh-btn-' + id);
+      if (btn) {
+        btn.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+        btn.disabled = true;
+      }
       vscode.postMessage({ command: 'refreshSingle', connectionId: id, name });
     }
 
     function testConn(id, name) {
+      const btn = document.getElementById('test-btn-' + id);
+      if (btn) {
+        btn.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+        btn.disabled = true;
+      }
       vscode.postMessage({ command: 'test', connectionId: id, name });
     }
 

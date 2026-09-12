@@ -269,7 +269,7 @@ export class DataProvider {
 
     try {
       const url = `${baseUrl}/api/providers/${connectionId}`;
-      const res = await this.httpRequest(url, token, 'PATCH', { isActive: nextActive });
+      const res = await this.httpRequest(url, token, 'PUT', { isActive: nextActive });
       return res.ok;
     } catch (err) {
       return false;

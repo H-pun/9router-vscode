@@ -30,16 +30,19 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
         case 'refresh':
           await this.refresh();
           break;
+        case 'refreshSingle':
+          await this.refresh();
+          vscode.window.showInformationMessage(`9Router: Quotas for "${data.name || 'Account'}" refreshed`);
+          break;
         case 'toggleActive':
           const success = await DataProvider.getInstance().toggleConnection(data.connectionId, data.nextActive);
           if (!success) {
-            // Rollback optimistic state in webview
             webviewView.webview.postMessage({
               type: 'toggleRollback',
               connectionId: data.connectionId,
               prevActive: data.prevActive
             });
-            vscode.window.showErrorMessage('9Router: Failed to update connection state. Rolled back.');
+            vscode.window.showErrorMessage('9Router: Failed to update connection state.');
           } else {
             webviewView.webview.postMessage({
               type: 'toggleResult',
