@@ -76,6 +76,9 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
       const topologyFlowCssUri = this._view.webview
         .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.css'))
         .toString();
+      const vscodeElementsJsUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscodeElements.js'))
+        .toString();
 
       this._view.webview.html = getUsageWebviewHtml(
         initialUsage,
@@ -83,6 +86,7 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
         codiconCssUri,
         topologyFlowJsUri,
         topologyFlowCssUri,
+        vscodeElementsJsUri,
         data.topologyProviders || [],
         data.initialChartData || []
       );

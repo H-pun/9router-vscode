@@ -6,6 +6,7 @@ export function getUsageWebviewHtml(
   codiconCssUri: string,
   topologyFlowJsUri: string,
   topologyFlowCssUri: string,
+  vscodeElementsJsUri: string,
   topologyProviders: TopologyProvider[],
   initialChartData: ChartDataPoint[]
 ): string {
@@ -29,7 +30,6 @@ export function getUsageWebviewHtml(
       --hover-bg: var(--vscode-list-hoverBackground);
       --text-muted: var(--vscode-descriptionForeground);
       --border: var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.22));
-      --tab-active-border: var(--vscode-panelTitle-activeBorder, var(--vscode-charts-orange, #f97316));
       --green: var(--vscode-charts-green, #388a34);
       --orange: var(--vscode-charts-orange, #d18616);
       --blue: #38bdf8;
@@ -57,370 +57,240 @@ export function getUsageWebviewHtml(
       flex-direction: column;
     }
 
-    /* Sub-Tabs Header */
-    .usage-tabs-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 4px;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
-      flex-shrink: 0;
-      height: 26px;
-    }
-
-    .tabs-left {
-      display: flex;
-      gap: 2px;
+    vscode-tabs {
       height: 100%;
-    }
-
-    .usage-tab-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 0 7px;
-      font-family: var(--font);
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-muted);
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-      transition: color 0.1s ease, border-color 0.1s ease;
-      outline: none;
-      height: 100%;
-    }
-
-    .usage-tab-btn:hover {
-      color: var(--fg);
-    }
-
-    .usage-tab-btn.active {
-      color: var(--fg);
-      font-weight: 600;
-      border-bottom-color: var(--tab-active-border);
-    }
-
-    .live-status {
-      font-size: 9.5px;
-      color: var(--green);
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding-right: 4px;
-    }
-
-    .live-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 4px var(--green);
-    }
-
-    /* Tab Panes */
-    .tab-content-area {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .usage-tab-pane {
-      display: none;
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-
-    .usage-tab-pane.active {
-      display: block;
-    }
-
-    /* React Flow & Chart Container */
-    #xyflow-root, #chart-root {
-      width: 100%;
-      height: 100%;
-      position: relative;
-    }
-
-    .react-flow__attribution {
-      display: none !important;
-    }
-
-    /* Recent Requests Table */
-    .recent-table-wrap {
       display: flex;
       flex-direction: column;
-      height: 100%;
-      background: var(--bg);
     }
 
-    .recent-table-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 8px;
-      background: var(--vscode-sideBarSectionHeader-background, transparent);
-      border-bottom: 1px solid var(--border);
-      font-size: 10px;
-      font-weight: 700;
+    vscode-tab-header {
+      font-size: 11px;
       text-transform: uppercase;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      flex-shrink: 0;
+      letter-spacing: 0.3px;
     }
 
-    .col-model { flex: 1; min-width: 0; }
-    .col-tokens { width: 100px; text-align: right; }
-    .col-time { width: 60px; text-align: right; }
-
-    .recent-list {
+    vscode-tab-panel {
       flex: 1;
+      height: 100%;
+      overflow: hidden;
+      padding: 0;
+      position: relative;
+    }
+
+    /* Tab 1: Graph Container */
+    .tab-content-graph {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Tab 2: Activity Container */
+    .tab-content-chart {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Tab 3: Recent Requests Container */
+    .tab-content-table {
+      width: 100%;
+      height: 100%;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
+      overflow-x: hidden;
+      padding: 4px 6px;
     }
 
-    .recent-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 8px;
-      border-bottom: 1px solid rgba(128, 128, 128, 0.08);
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
-      transition: background 0.08s ease;
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
     }
 
-    .recent-row:hover {
+    thead th {
+      text-align: left;
+      padding: 4px 6px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 2;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.08s;
+    }
+
+    tbody tr:hover {
       background: var(--hover-bg);
+    }
+
+    td {
+      padding: 4px 6px;
+      vertical-align: middle;
     }
 
     .model-cell {
       display: flex;
       align-items: center;
       gap: 5px;
-      min-width: 0;
-      flex: 1;
+      max-width: 130px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .provider-logo-img {
+    .model-icon {
       width: 14px;
       height: 14px;
-      object-fit: contain;
       border-radius: 2px;
+      object-fit: contain;
       flex-shrink: 0;
     }
 
-    .recent-model-name {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: var(--fg);
-      font-size: 11px;
-    }
-
-    .tokens-cell {
-      width: 100px;
-      text-align: right;
-      color: var(--text-muted);
-      font-size: 10.5px;
-      white-space: nowrap;
-    }
-
-    .tokens-in { color: var(--fg); font-weight: 500; }
-    .tokens-out { color: var(--text-muted); }
-
     .time-cell {
-      width: 60px;
-      text-align: right;
-      color: var(--blue);
-      font-size: 10.5px;
-      white-space: nowrap;
-    }
-
-    .empty-msg {
-      padding: 10px 14px;
-      font-size: 11px;
       color: var(--text-muted);
-      font-style: italic;
-      text-align: center;
+      font-size: 10.5px;
+      text-align: right;
     }
 
-    .codicon {
-      font-size: 14px;
-      line-height: 1;
+    .tokens-badge {
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 10.5px;
+    }
+
+    .empty-state {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 11.5px;
     }
   </style>
+  <script type="module" src="${vscodeElementsJsUri}"></script>
 </head>
 <body>
+  <vscode-tabs selected-index="0" id="usage-tabs">
+    <vscode-tab-header slot="header">Graph</vscode-tab-header>
+    <vscode-tab-panel>
+      <div class="tab-content-graph" id="xyflow-root"></div>
+    </vscode-tab-panel>
 
-  <!-- Sub-Tabs Header -->
-  <div class="usage-tabs-header">
-    <div class="tabs-left">
-      <button type="button" class="usage-tab-btn active" id="tab-btn-graph" onclick="switchUsageTab('graph')">
-        <i class="codicon codicon-graph"></i>
-        <span>Topology</span>
-      </button>
-      <button type="button" class="usage-tab-btn" id="tab-btn-chart" onclick="switchUsageTab('chart')">
-        <i class="codicon codicon-pulse"></i>
-        <span>Activity</span>
-      </button>
-      <button type="button" class="usage-tab-btn" id="tab-btn-recent" onclick="switchUsageTab('recent')">
-        <i class="codicon codicon-history"></i>
-        <span>Recent Requests</span>
-      </button>
-    </div>
-    <div class="live-status">
-      <span class="live-dot"></span>
-      Live
-    </div>
-  </div>
+    <vscode-tab-header slot="header">Activity</vscode-tab-header>
+    <vscode-tab-panel>
+      <div class="tab-content-chart" id="chart-root"></div>
+    </vscode-tab-panel>
 
-  <!-- Content Area -->
-  <div class="tab-content-area">
-    <!-- TAB 1: 1:1 React Flow Topology Canvas -->
-    <div class="usage-tab-pane active" id="pane-graph">
-      <div id="xyflow-root"></div>
-    </div>
-
-    <!-- TAB 2: 1:1 Recharts Usage Area Chart (Activity) -->
-    <div class="usage-tab-pane" id="pane-chart">
-      <div id="chart-root"></div>
-    </div>
-
-    <!-- TAB 3: Recent Requests Table -->
-    <div class="usage-tab-pane" id="pane-recent">
-      <div class="recent-table-wrap">
-        <div class="recent-table-header">
-          <span class="col-model">Model</span>
-          <span class="col-tokens">In / Out</span>
-          <span class="col-time">When</span>
-        </div>
-        <div class="recent-list" id="recent-requests-list"></div>
+    <vscode-tab-header slot="header">Recent Requests</vscode-tab-header>
+    <vscode-tab-panel>
+      <div class="tab-content-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>In / Out</th>
+              <th style="text-align: right;">When</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr>
+              <td colspan="3" class="empty-state">Waiting for requests...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
-  </div>
+    </vscode-tab-panel>
+  </vscode-tabs>
 
   <script>
     const vscode = acquireVsCodeApi();
     window.__VSCODE__ = vscode;
-    window.__ICON_MAP__ = ${iconMapJson};
-    window.__INITIAL_USAGE__ = ${initialUsageJson};
+    window.__PROVIDER_ICONS__ = ${iconMapJson};
     window.__TOPOLOGY_PROVIDERS__ = ${topologyProvidersJson};
+    window.__INITIAL_USAGE__ = ${initialUsageJson};
     window.__INITIAL_CHART_DATA__ = ${initialChartJson};
-  </script>
 
-  <!-- Load 1:1 @xyflow/react & Recharts Bundle -->
-  <script src="${topologyFlowJsUri}"></script>
+    const providerIconMap = window.__PROVIDER_ICONS__;
 
-  <script>
-    const iconMap = ${iconMapJson};
-    let initialUsage = ${initialUsageJson};
-    let currentUsageTab = 'graph';
-
-    function switchUsageTab(tabName) {
-      currentUsageTab = tabName;
-      document.getElementById('tab-btn-graph').classList.toggle('active', tabName === 'graph');
-      document.getElementById('tab-btn-chart').classList.toggle('active', tabName === 'chart');
-      document.getElementById('tab-btn-recent').classList.toggle('active', tabName === 'recent');
-
-      document.getElementById('pane-graph').classList.toggle('active', tabName === 'graph');
-      document.getElementById('pane-chart').classList.toggle('active', tabName === 'chart');
-      document.getElementById('pane-recent').classList.toggle('active', tabName === 'recent');
-
-      if (tabName === 'chart') {
-        window.dispatchEvent(new Event('resize'));
-      }
+    // Handle tab change resize events for React Flow & Recharts
+    const tabsEl = document.getElementById('usage-tabs');
+    if (tabsEl) {
+      tabsEl.addEventListener('vsc-tabs-select', () => {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+        }, 50);
+      });
     }
 
-    function formatRelativeTime(timestamp) {
-      if (!timestamp) return '-';
-      const time = new Date(timestamp).getTime();
-      const diffSec = Math.floor((Date.now() - time) / 1000);
-      if (diffSec < 15) return 'Just now';
-      if (diffSec < 60) return \`\${diffSec}s ago\`;
-      const mins = Math.floor(diffSec / 60);
-      if (mins < 60) return \`\${mins}m ago\`;
-      const hours = Math.floor(mins / 60);
-      return \`\${hours}h ago\`;
+    function fmtNumber(n) {
+      if (!n) return '0';
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return String(n);
     }
 
-    function formatTokensNumber(num) {
-      if (!num || num === 0) return '0';
-      if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'm';
-      if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
-      return String(num);
+    function timeAgo(dateStr) {
+      if (!dateStr) return '';
+      const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+      if (seconds < 5) return 'just now';
+      if (seconds < 60) return seconds + 's ago';
+      if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+      return Math.floor(seconds / 86400) + 'd ago';
     }
 
-    function getProviderIconHtml(provKey) {
-      const src = iconMap[provKey] || iconMap[provKey.toLowerCase()];
-      if (src) {
-        return \`<img class="provider-logo-img" src="\${src}" alt="\${provKey}" />\`;
-      }
-      return '<i class="codicon codicon-hubot"></i>';
-    }
+    function renderLogsTable(requests) {
+      const tbody = document.getElementById('logs-tbody');
+      if (!tbody) return;
 
-    function renderRecentRequests(requests) {
-      const list = document.getElementById('recent-requests-list');
-      if (!list) return;
-
-      if (!requests || requests.length === 0) {
-        list.innerHTML = '<div class="empty-msg">No recent request logs.</div>';
+      if (!Array.isArray(requests) || requests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No requests recorded yet</td></tr>';
         return;
       }
 
-      let html = '';
-      requests.slice(0, 30).forEach(r => {
-        const provKey = (r.provider || 'ai').toLowerCase();
-        const logo = getProviderIconHtml(provKey);
-        const inTok = formatTokensNumber(r.promptTokens);
-        const outTok = formatTokensNumber(r.completionTokens);
-        const when = formatRelativeTime(r.timestamp);
+      tbody.innerHTML = requests.map(req => {
+        const provKey = (req.provider || '').toLowerCase();
+        const iconSrc = providerIconMap[provKey] || '';
+        const inTokens = fmtNumber(req.promptTokens || 0);
+        const outTokens = fmtNumber(req.completionTokens || 0);
 
-        html += \`
-          <div class="recent-row">
-            <div class="model-cell">
-              \${logo}
-              <span class="recent-model-name" title="\${r.model}">\${r.model}</span>
-            </div>
-            <div class="tokens-cell">
-              <span class="tokens-in">\${inTok}</span>
-              <span style="opacity: 0.5;"> / </span>
-              <span class="tokens-out">\${outTok}</span>
-            </div>
-            <div class="time-cell">\${when}</div>
-          </div>
+        return \`
+          <tr>
+            <td>
+              <div class="model-cell">
+                \${iconSrc ? \`<img src="\${iconSrc}" class="model-icon" alt="" />\` : '<span class="codicon codicon-symbol-misc" style="font-size: 13px;"></span>'}
+                <span title="\${req.model}">\${req.model || 'Unknown'}</span>
+              </div>
+            </td>
+            <td>
+              <span class="tokens-badge">\${inTokens} <span style="color: var(--text-muted);">/</span> \${outTokens}</span>
+            </td>
+            <td class="time-cell">\${timeAgo(req.timestamp)}</td>
+          </tr>
         \`;
-      });
-
-      list.innerHTML = html;
+      }).join('');
     }
 
+    // Initial table render
+    if (window.__INITIAL_USAGE__ && window.__INITIAL_USAGE__.recentRequests) {
+      renderLogsTable(window.__INITIAL_USAGE__.recentRequests);
+    }
+
+    // Stream listener for table
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (msg && msg.type === 'usageStream' && msg.data) {
-        const streamData = msg.data;
-        if (streamData.recentRequests && streamData.recentRequests.length > 0) {
-          renderRecentRequests(streamData.recentRequests);
+        if (Array.isArray(msg.data.recentRequests)) {
+          renderLogsTable(msg.data.recentRequests);
         }
       }
     });
 
-    if (initialUsage && initialUsage.recentRequests) {
-      renderRecentRequests(initialUsage.recentRequests);
-    }
-
-    setInterval(() => {
-      if (initialUsage && initialUsage.recentRequests) {
-        renderRecentRequests(initialUsage.recentRequests);
-      }
-    }, 10000);
+    vscode.postMessage({ command: 'ready' });
   </script>
+  <script src="${topologyFlowJsUri}"></script>
 </body>
 </html>`;
 }

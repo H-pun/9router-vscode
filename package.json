@@ -149,12 +149,13 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@types/vscode": "^1.85.0",
-    "@vscode/codicons": "^0.0.36",
+    "@vscode/codicons": "^0.0.40",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.25.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@vscode-elements/elements": "^2.5.1",
     "@xyflow/react": "^12.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
