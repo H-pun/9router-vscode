@@ -61,13 +61,17 @@ export function getUsageWebviewHtml(
       height: 100%;
       display: flex;
       flex-direction: column;
-      padding: 0 12px;
+      padding: 0;
     }
 
     vscode-tab-header {
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.3px;
+    }
+
+    vscode-tab-header:first-of-type {
+      margin-left: 12px;
     }
 
     vscode-tab-panel {
@@ -98,7 +102,7 @@ export function getUsageWebviewHtml(
       height: 100%;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 4px 0;
+      padding: 0;
     }
 
     table {
