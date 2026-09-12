@@ -603,14 +603,14 @@ export function UsageChartApp() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        padding: '8px 0 0 0',
+        padding: '8px 10px 4px 10px',
         boxSizing: 'border-box',
-        gap: '8px',
+        gap: '10px',
         fontFamily: 'var(--vscode-font-family, sans-serif)',
       }}
     >
       {/* Control Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '6px', padding: '0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '6px' }}>
         {/* Tokens / Cost Switch */}
         <vscode-button-group>
           <vscode-button
@@ -656,7 +656,7 @@ export function UsageChartApp() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 6, right: 6, left: -24, bottom: 2 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 6, left: -22, bottom: 4 }}>
               <defs>
                 <linearGradient id="gradTokens" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
