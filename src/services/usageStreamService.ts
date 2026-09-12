@@ -174,21 +174,12 @@ export class UsageStreamService {
   }
 
   private updateData(parsed: any): void {
-    // Merge new requests into buffer
-    const newRecent = Array.isArray(parsed.recentRequests) ? parsed.recentRequests : [];
-    
-    // Combine existing recent with new while deduplicating by timestamp & model if needed
-    const combinedRecent = [...newRecent];
-    if (combinedRecent.length > this.maxBuffer) {
-      combinedRecent.length = this.maxBuffer;
-    }
-
     this.currentData = {
       totalRequests: parsed.totalRequests ?? this.currentData.totalRequests,
       totalPromptTokens: parsed.totalPromptTokens ?? this.currentData.totalPromptTokens,
       totalCompletionTokens: parsed.totalCompletionTokens ?? this.currentData.totalCompletionTokens,
-      activeRequests: parsed.activeRequests || [],
-      recentRequests: combinedRecent,
+      activeRequests: Array.isArray(parsed.activeRequests) ? parsed.activeRequests : [],
+      recentRequests: Array.isArray(parsed.recentRequests) ? parsed.recentRequests : [],
       byProvider: parsed.byProvider || this.currentData.byProvider,
       lastUpdated: new Date().toLocaleTimeString()
     };

@@ -66,6 +66,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "9router.refreshUsage",
+        "title": "Refresh Usage",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "9router.configureSettings",
         "title": "Configure 9Router Settings",
         "icon": "$(settings-gear)"
@@ -97,6 +102,11 @@
           "command": "9router.openWebDashboard",
           "when": "view == 9router.quotaTrackerView",
           "group": "navigation@4"
+        },
+        {
+          "command": "9router.refreshUsage",
+          "when": "view == 9router.usageView",
+          "group": "navigation@1"
         }
       ],
       "9router.filterSubmenu": [

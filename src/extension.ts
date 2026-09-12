@@ -54,12 +54,16 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Refresh Command
+  // Refresh Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.refreshStats', async () => {
       await quotaWebviewProvider.refresh();
-      await usageWebviewProvider.render();
       vscode.window.showInformationMessage('9Router: Quotas refreshed');
+    }),
+    vscode.commands.registerCommand('9router.refreshUsage', async () => {
+      UsageStreamService.getInstance().reconnect();
+      await usageWebviewProvider.render();
+      vscode.window.showInformationMessage('9Router: Usage data refreshed');
     })
   );
 
