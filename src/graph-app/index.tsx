@@ -399,6 +399,7 @@ function buildLayout(providers: any[], activeSet: Set<string>, lastSet: Set<stri
 
 declare global {
   interface Window {
+    __PROVIDER_ICONS__?: Record<string, string>;
     __ICON_MAP__?: Record<string, string>;
     __TOPOLOGY_PROVIDERS__?: Array<{ provider: string; name: string }>;
     __INITIAL_CHART_DATA__?: Array<{ label: string; tokens: number; cost: number }>;
@@ -409,21 +410,22 @@ declare global {
 // ================= COMPONENT 1: TOPOLOGY GRAPH =================
 export function ProviderTopologyApp() {
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
-  const iconMap = window.__ICON_MAP__ || {};
-
-  const providers = useMemo(() => {
-    const rawList = window.__TOPOLOGY_PROVIDERS__ || [
+  const iconMap = window.__PROVIDER_ICONS__ || window.__ICON_MAP__ || {};
+  const [topologyProviders, setTopologyProviders] = useState<Array<{ provider: string; name: string }>>(
+    window.__TOPOLOGY_PROVIDERS__ || [
       { provider: 'antigravity', name: 'Antigravity' },
       { provider: 'claude', name: 'Claude Code' },
       { provider: 'opencode', name: 'OpenCode Free' },
       { provider: 'mimo', name: 'MiMo Code Free' },
-    ];
+    ]
+  );
 
-    return rawList.map(p => ({
+  const providers = useMemo(() => {
+    return topologyProviders.map(p => ({
       ...p,
       imageUrl: iconMap[p.provider.toLowerCase()] || iconMap[p.provider],
     }));
-  }, [iconMap]);
+  }, [topologyProviders, iconMap]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {

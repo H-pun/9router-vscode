@@ -273,6 +273,7 @@ export function getUsageWebviewHtml(
     const vscode = acquireVsCodeApi();
     window.__VSCODE__ = vscode;
     window.__PROVIDER_ICONS__ = ${iconMapJson};
+    window.__ICON_MAP__ = ${iconMapJson};
     window.__TOPOLOGY_PROVIDERS__ = ${topologyProvidersJson};
     window.__INITIAL_USAGE__ = ${initialUsageJson};
     window.__INITIAL_CHART_DATA__ = ${initialChartJson};
