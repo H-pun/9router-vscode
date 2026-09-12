@@ -131,8 +131,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "tsc --noEmit -p ./",
+    "watch": "tsc --noEmit -watch -p ./",
     "build": "node esbuild.js --production",
     "package": "npm run build && npx @vscode/vsce package --no-dependencies"
   },
