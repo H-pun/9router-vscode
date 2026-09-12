@@ -95,48 +95,19 @@ export function getUsageWebviewHtml(
     .tab-content-table {
       width: 100%;
       height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding: 4px 6px;
+      overflow: hidden;
     }
 
-    table {
+    vscode-table {
       width: 100%;
-      border-collapse: collapse;
+      height: 100%;
       font-size: 11.5px;
-    }
-
-    thead th {
-      text-align: left;
-      padding: 4px 6px;
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      background: var(--bg);
-      z-index: 2;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background 0.08s;
-    }
-
-    tbody tr:hover {
-      background: var(--hover-bg);
-    }
-
-    td {
-      padding: 4px 6px;
-      vertical-align: middle;
     }
 
     .model-cell {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       max-width: 130px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -144,8 +115,8 @@ export function getUsageWebviewHtml(
     }
 
     .model-icon {
-      width: 14px;
-      height: 14px;
+      width: 15px;
+      height: 15px;
       border-radius: 2px;
       object-fit: contain;
       flex-shrink: 0;
@@ -154,12 +125,13 @@ export function getUsageWebviewHtml(
     .time-cell {
       color: var(--text-muted);
       font-size: 10.5px;
-      text-align: right;
+      white-space: nowrap;
     }
 
     .tokens-badge {
       font-family: var(--vscode-editor-font-family, monospace);
       font-size: 10.5px;
+      white-space: nowrap;
     }
 
     .empty-state {
@@ -186,20 +158,20 @@ export function getUsageWebviewHtml(
     <vscode-tab-header slot="header">Recent Requests</vscode-tab-header>
     <vscode-tab-panel>
       <div class="tab-content-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Model</th>
-              <th>In / Out</th>
-              <th style="text-align: right;">When</th>
-            </tr>
-          </thead>
-          <tbody id="logs-tbody">
-            <tr>
-              <td colspan="3" class="empty-state">Waiting for requests...</td>
-            </tr>
-          </tbody>
-        </table>
+        <vscode-table bordered-rows zebra columns='["auto", "120px", "65px"]'>
+          <vscode-table-header slot="header">
+            <vscode-table-header-cell>Model</vscode-table-header-cell>
+            <vscode-table-header-cell>In / Out</vscode-table-header-cell>
+            <vscode-table-header-cell>When</vscode-table-header-cell>
+          </vscode-table-header>
+          <vscode-table-body slot="body" id="logs-tbody">
+            <vscode-table-row>
+              <vscode-table-cell class="empty-state">Waiting for requests...</vscode-table-cell>
+              <vscode-table-cell></vscode-table-cell>
+              <vscode-table-cell></vscode-table-cell>
+            </vscode-table-row>
+          </vscode-table-body>
+        </vscode-table>
       </div>
     </vscode-tab-panel>
   </vscode-tabs>
@@ -246,7 +218,7 @@ export function getUsageWebviewHtml(
       if (!tbody) return;
 
       if (!Array.isArray(requests) || requests.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No requests recorded yet</td></tr>';
+        tbody.innerHTML = '<vscode-table-row><vscode-table-cell class="empty-state">No requests recorded yet</vscode-table-cell><vscode-table-cell></vscode-table-cell><vscode-table-cell></vscode-table-cell></vscode-table-row>';
         return;
       }
 
@@ -257,18 +229,20 @@ export function getUsageWebviewHtml(
         const outTokens = fmtNumber(req.completionTokens || 0);
 
         return \`
-          <tr>
-            <td>
+          <vscode-table-row>
+            <vscode-table-cell>
               <div class="model-cell">
                 \${iconSrc ? \`<img src="\${iconSrc}" class="model-icon" alt="" />\` : '<span class="codicon codicon-symbol-misc" style="font-size: 13px;"></span>'}
                 <span title="\${req.model}">\${req.model || 'Unknown'}</span>
               </div>
-            </td>
-            <td>
+            </vscode-table-cell>
+            <vscode-table-cell>
               <span class="tokens-badge">\${inTokens} <span style="color: var(--text-muted);">/</span> \${outTokens}</span>
-            </td>
-            <td class="time-cell">\${timeAgo(req.timestamp)}</td>
-          </tr>
+            </vscode-table-cell>
+            <vscode-table-cell>
+              <span class="time-cell">\${timeAgo(req.timestamp)}</span>
+            </vscode-table-cell>
+          </vscode-table-row>
         \`;
       }).join('');
     }
