@@ -31,6 +31,18 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
         this._streamDisposer();
       }
     });
+
+    webviewView.webview.onDidReceiveMessage(async (data) => {
+      switch (data.command) {
+        case 'fetchChart':
+          const chartData = await DataProvider.getInstance().fetchChartData(data.period || 'today');
+          webviewView.webview.postMessage({
+            type: 'chartData',
+            data: chartData
+          });
+          break;
+      }
+    });
   }
 
   private startLiveStream() {
@@ -63,7 +75,22 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
       const codiconCssUri = this._view.webview
         .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicons', 'codicon.css'))
         .toString();
-      this._view.webview.html = getUsageWebviewHtml(initialUsage, iconMap, codiconCssUri);
+      const topologyFlowJsUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.js'))
+        .toString();
+      const topologyFlowCssUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.css'))
+        .toString();
+
+      this._view.webview.html = getUsageWebviewHtml(
+        initialUsage,
+        iconMap,
+        codiconCssUri,
+        topologyFlowJsUri,
+        topologyFlowCssUri,
+        data.topologyProviders || [],
+        data.initialChartData || []
+      );
     }
   }
 

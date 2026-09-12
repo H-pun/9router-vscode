@@ -3,7 +3,8 @@ import { RouterQuotaData, ProviderConnection, QuotaItem } from '../dataProvider'
 export function getQuotaWebviewHtml(
   data: RouterQuotaData,
   providerIconMap: Record<string, string>,
-  codiconCssUri: string
+  codiconCssUri: string,
+  initialFilter: string = 'active'
 ): string {
   const connectionsJson = JSON.stringify(data.connections);
   const iconMapJson = JSON.stringify(providerIconMap);
@@ -25,11 +26,6 @@ export function getQuotaWebviewHtml(
       --border: var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.22));
       --dropdown-bg: var(--vscode-dropdown-background);
       --dropdown-fg: var(--vscode-dropdown-foreground);
-      --dropdown-border: var(--vscode-dropdown-border, rgba(128, 128, 128, 0.3));
-      --menu-bg: var(--vscode-menu-background, var(--vscode-dropdown-background, #252526));
-      --menu-border: var(--vscode-menu-border, var(--vscode-dropdown-border, rgba(128, 128, 128, 0.25)));
-      --menu-hover: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08)));
-      --focus-border: var(--vscode-focusBorder, #007fd4);
       --green: var(--vscode-charts-green, #388a34);
       --orange: var(--vscode-charts-orange, #d18616);
       --red: var(--vscode-charts-red, #f14c4c);
@@ -51,137 +47,9 @@ export function getQuotaWebviewHtml(
       font-family: var(--font);
       font-size: var(--font-size);
       line-height: 1.4;
-      padding: 4px 0 8px 0;
+      padding: 4px 0 10px 0;
       overflow-x: hidden;
       overflow-y: auto;
-    }
-
-    /* Top Toolbar with Filter */
-    .filter-bar {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      padding: 2px 8px 6px 8px;
-    }
-
-    /* Custom VS Code Native Dropdown Menu */
-    .custom-dropdown-wrap {
-      position: relative;
-      display: inline-block;
-    }
-
-    .custom-dropdown-trigger {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: var(--dropdown-bg);
-      color: var(--dropdown-fg);
-      border: 1px solid var(--dropdown-border);
-      border-radius: 3px;
-      height: 22px;
-      padding: 0 6px;
-      font-family: var(--font);
-      font-size: 11px;
-      cursor: pointer;
-      transition: border-color 0.1s ease, background 0.1s ease;
-      outline: none;
-    }
-
-    .custom-dropdown-trigger:hover {
-      background: var(--hover-bg);
-      border-color: var(--focus-border);
-    }
-
-    .custom-dropdown-trigger:focus-visible {
-      border-color: var(--focus-border);
-      outline: 1px solid var(--focus-border);
-      outline-offset: -1px;
-    }
-
-    .filter-trigger-label {
-      font-weight: 500;
-      white-space: nowrap;
-    }
-
-    .filter-trigger-arrow {
-      font-size: 11px;
-      color: var(--text-muted);
-      transition: transform 0.15s ease;
-      margin-left: 2px;
-    }
-
-    .custom-dropdown-wrap.open .filter-trigger-arrow {
-      transform: rotate(180deg);
-    }
-
-    /* Floating Popup Menu */
-    .custom-dropdown-menu {
-      display: none;
-      position: absolute;
-      top: calc(100% + 4px);
-      right: 0;
-      left: auto;
-      min-width: 155px;
-      max-width: 200px;
-      background: var(--menu-bg);
-      color: var(--dropdown-fg);
-      border: 1px solid var(--menu-border);
-      border-radius: 5px;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-      padding: 3px;
-      z-index: 99999;
-      animation: menuFadeIn 0.1s ease-out;
-    }
-
-    .custom-dropdown-wrap.open .custom-dropdown-menu {
-      display: flex;
-      flex-direction: column;
-    }
-
-    @keyframes menuFadeIn {
-      from { opacity: 0; transform: translateY(-3px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .dropdown-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      border-radius: 3px;
-      font-size: 11.5px;
-      cursor: pointer;
-      color: var(--fg);
-      text-align: left;
-      transition: background 0.08s ease;
-    }
-
-    .dropdown-menu-item:hover {
-      background: var(--menu-hover);
-      color: #ffffff;
-    }
-
-    .item-check {
-      width: 14px;
-      height: 14px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      color: var(--fg);
-      opacity: 0;
-      flex-shrink: 0;
-    }
-
-    .dropdown-menu-item.selected .item-check {
-      opacity: 1;
-    }
-
-    .item-label {
-      font-weight: 500;
-      flex: 1;
-      white-space: nowrap;
-      text-align: left;
     }
 
     /* Action Buttons */
@@ -189,15 +57,15 @@ export function getQuotaWebviewHtml(
       background: transparent;
       border: none;
       color: var(--text-muted);
-      width: 22px;
-      height: 22px;
-      border-radius: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       transition: background 0.08s, color 0.08s;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .icon-btn:hover {
@@ -209,7 +77,7 @@ export function getQuotaWebviewHtml(
     .provider-group {
       display: flex;
       flex-direction: column;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
 
     .provider-header {
@@ -499,10 +367,11 @@ export function getQuotaWebviewHtml(
     }
 
     .empty-msg {
-      padding: 6px 10px 6px 16px;
-      font-size: 11px;
+      padding: 10px 14px;
+      font-size: 11.5px;
       color: var(--text-muted);
       font-style: italic;
+      text-align: center;
     }
 
     .codicon {
@@ -513,32 +382,7 @@ export function getQuotaWebviewHtml(
 </head>
 <body>
 
-  <!-- Top Filter Action Bar -->
-  <div class="filter-bar">
-    <div class="custom-dropdown-wrap" id="filter-dropdown-wrap">
-      <button type="button" class="custom-dropdown-trigger" id="filter-dropdown-btn" title="Filter Accounts">
-        <span class="filter-trigger-label" id="filter-current-label">Active</span>
-        <i class="codicon codicon-chevron-down filter-trigger-arrow"></i>
-      </button>
-
-      <div class="custom-dropdown-menu" id="filter-dropdown-menu">
-        <div class="dropdown-menu-item selected" data-value="active" onclick="selectFilter('active', 'Active')">
-          <span class="item-check"><i class="codicon codicon-check"></i></span>
-          <span class="item-label">Active</span>
-        </div>
-        <div class="dropdown-menu-item" data-value="all" onclick="selectFilter('all', 'All')">
-          <span class="item-check"><i class="codicon codicon-check"></i></span>
-          <span class="item-label">All</span>
-        </div>
-        <div class="dropdown-menu-item" data-value="idle" onclick="selectFilter('idle', 'Inactive / Turn Off')">
-          <span class="item-check"><i class="codicon codicon-check"></i></span>
-          <span class="item-label">Inactive / Turn Off</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quota Tree Root -->
+  <!-- Pure Tree Root (No Fake Headers) -->
   <div id="tree-root"></div>
 
   <script>
@@ -546,36 +390,21 @@ export function getQuotaWebviewHtml(
     const connections = ${connectionsJson};
     const iconMap = ${iconMapJson};
     
-    let currentFilter = 'active';
+    let currentFilter = '${initialFilter}';
     const groupCollapseMap = {};
     const accountCollapseMap = {};
-
-    const dropdownWrap = document.getElementById('filter-dropdown-wrap');
-    const triggerBtn = document.getElementById('filter-dropdown-btn');
-    const currentLabelEl = document.getElementById('filter-current-label');
-
-    triggerBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdownWrap.classList.toggle('open');
-    });
-
-    window.addEventListener('click', () => {
-      dropdownWrap.classList.remove('open');
-    });
-
-    function selectFilter(val, label) {
-      currentFilter = val;
-      currentLabelEl.textContent = label;
-      document.querySelectorAll('.dropdown-menu-item').forEach(item => {
-        item.classList.toggle('selected', item.getAttribute('data-value') === val);
-      });
-      dropdownWrap.classList.remove('open');
-      renderGroupedTree();
-    }
 
     connections.forEach(c => {
       if (accountCollapseMap[c.id] === undefined) {
         accountCollapseMap[c.id] = !c.isActive;
+      }
+    });
+
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      if (msg && msg.type === 'setFilter') {
+        currentFilter = msg.filter || 'active';
+        renderGroupedTree();
       }
     });
 
@@ -587,7 +416,7 @@ export function getQuotaWebviewHtml(
       if (p === 'azure') return 'Azure OpenAI';
       if (p === 'kiro') return 'Kiro AI';
       if (p === 'codex') return 'Codex';
-      if (p === 'mimo') return 'MiMo Free';
+      if (p === 'mimo') return 'MiMo Code Free';
       if (p === 'opencode') return 'OpenCode Free';
       return provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Provider';
     }
@@ -639,7 +468,7 @@ export function getQuotaWebviewHtml(
       }
 
       if (!filteredConns || filteredConns.length === 0) {
-        root.innerHTML = '<div class="empty-msg">No accounts found for selected filter.</div>';
+        root.innerHTML = '<div class="empty-msg">No accounts found for selected filter (' + currentFilter + ').</div>';
         return;
       }
 
@@ -790,7 +619,6 @@ export function getQuotaWebviewHtml(
       vscode.postMessage({ command: 'toggleActive', connectionId: id, nextActive });
     }
 
-    // Initial render
     renderGroupedTree();
   </script>
 </body>

@@ -38,12 +38,12 @@ const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const dataProvider_1 = require("./dataProvider");
-const nativeAccordionView_1 = require("./views/nativeAccordionView");
+const quotaWebviewHtml_1 = require("./views/quotaWebviewHtml");
 class QuotaWebviewProvider {
     _extensionUri;
     static viewType = '9router.quotaTrackerView';
     _view;
-    _streamDisposer;
+    _currentFilter = 'active';
     constructor(_extensionUri) {
         this._extensionUri = _extensionUri;
     }
@@ -54,28 +54,15 @@ class QuotaWebviewProvider {
             localResourceRoots: [this._extensionUri]
         };
         this.refresh();
-        this.startLiveStream();
-        webviewView.onDidDispose(() => {
-            if (this._streamDisposer) {
-                this._streamDisposer();
-            }
-        });
         webviewView.webview.onDidReceiveMessage(async (data) => {
             switch (data.command) {
                 case 'refresh':
                     await this.refresh();
-                    vscode.window.showInformationMessage('9Router: Refreshed');
+                    vscode.window.showInformationMessage('9Router: Quotas refreshed');
                     break;
                 case 'refreshSingle':
                     await this.refresh();
                     vscode.window.showInformationMessage(`9Router: Quota refreshed for ${data.name || 'account'}`);
-                    break;
-                case 'fetchChart':
-                    const chartData = await dataProvider_1.DataProvider.getInstance().fetchChartData(data.period || 'today');
-                    webviewView.webview.postMessage({
-                        type: 'chartData',
-                        data: chartData
-                    });
                     break;
                 case 'test':
                     await vscode.window.withProgress({
@@ -111,18 +98,14 @@ class QuotaWebviewProvider {
             }
         });
     }
-    startLiveStream() {
-        if (this._streamDisposer) {
-            this._streamDisposer();
+    setFilter(filter) {
+        this._currentFilter = filter;
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'setFilter',
+                filter
+            });
         }
-        this._streamDisposer = dataProvider_1.DataProvider.getInstance().listenUsageStream((streamData) => {
-            if (this._view) {
-                this._view.webview.postMessage({
-                    type: 'usageStream',
-                    data: streamData
-                });
-            }
-        });
     }
     async refresh() {
         if (this._view) {
@@ -131,13 +114,7 @@ class QuotaWebviewProvider {
             const codiconCssUri = this._view.webview
                 .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicons', 'codicon.css'))
                 .toString();
-            const topologyFlowJsUri = this._view.webview
-                .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.js'))
-                .toString();
-            const topologyFlowCssUri = this._view.webview
-                .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.css'))
-                .toString();
-            this._view.webview.html = (0, nativeAccordionView_1.getNativeAccordionHtml)(data, iconMap, codiconCssUri, topologyFlowJsUri, topologyFlowCssUri);
+            this._view.webview.html = (0, quotaWebviewHtml_1.getQuotaWebviewHtml)(data, iconMap, codiconCssUri, this._currentFilter);
         }
     }
     getProviderIconMap(webview) {
