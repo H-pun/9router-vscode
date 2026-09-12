@@ -1,0 +1,104 @@
+{
+  "name": "9router-vscode-monitor",
+  "displayName": "9Router (VS Code)",
+  "description": "Native VS Code Quota Tracker & Usage Monitor for 9Router",
+  "version": "0.9.0",
+  "publisher": "harpun",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "9router-sidebar",
+          "title": "9Router",
+          "icon": "media/router-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "9router-sidebar": [
+        {
+          "type": "webview",
+          "id": "9router.quotaTrackerView",
+          "name": "9Router",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "9router.refreshStats",
+        "title": "Refresh All Quotas",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "9router.configureSettings",
+        "title": "Configure 9Router Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "9router.openWebDashboard",
+        "title": "Open 9Router Web Dashboard",
+        "icon": "$(globe)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "9router.configureSettings",
+          "when": "view == 9router.quotaTrackerView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "9router.openWebDashboard",
+          "when": "view == 9router.quotaTrackerView",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "9Router Monitor",
+      "properties": {
+        "9router.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:20128",
+          "description": "Base URL of the 9Router server instance"
+        },
+        "9router.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key for authenticating with 9Router (leave blank for local direct access)"
+        },
+        "9router.refreshInterval": {
+          "type": "number",
+          "default": 900,
+          "description": "Auto-refresh interval in seconds for quota tracking (default: 900s / 15 mins)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "node esbuild.js --production",
+    "package": "npm run build && npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.46-24"
+  }
+}
