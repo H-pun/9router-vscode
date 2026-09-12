@@ -3,8 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataProvider } from './dataProvider';
-import { QuotaWebviewProvider } from './quotaWebviewProvider';
-import { UsageWebviewProvider } from './usageWebviewProvider';
+import { QuotaWebviewProvider } from './providers/quotaWebviewProvider';
+import { LogsWebviewProvider } from './providers/logsWebviewProvider';
+import { TopologyWebviewProvider } from './providers/topologyWebviewProvider';
+import { AnalyticsWebviewProvider } from './providers/analyticsWebviewProvider';
+import { UsageStreamService } from './services/usageStreamService';
 import { migrateApiKey, SECRET_KEY } from './secretMigration';
 
 let refreshTimer: NodeJS.Timeout | undefined;
@@ -15,27 +18,63 @@ export async function activate(context: vscode.ExtensionContext) {
   // Initialize SecretStorage on DataProvider
   DataProvider.getInstance().setSecretStorage(context.secrets);
 
+  // Initialize Singleton SSE Service
+  UsageStreamService.getInstance().init(context);
+
   // Migrate legacy configuration apiKey to SecretStorage if present
   await migrateApiKey(context);
 
-  // 1. Register Native Views (Official VS Code ViewPanes)
+  // 1. Register 4 Native Auxiliary Webview Providers with retainContextWhenHidden
   const quotaWebviewProvider = new QuotaWebviewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       QuotaWebviewProvider.viewType,
-      quotaWebviewProvider
+      quotaWebviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
 
-  const usageWebviewProvider = new UsageWebviewProvider(context.extensionUri);
+  const logsWebviewProvider = new LogsWebviewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      UsageWebviewProvider.viewType,
-      usageWebviewProvider
+      LogsWebviewProvider.viewType,
+      logsWebviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
 
-  // 2. Register Filter Submenu Commands
+  const topologyWebviewProvider = new TopologyWebviewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      TopologyWebviewProvider.viewType,
+      topologyWebviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+
+  const analyticsWebviewProvider = new AnalyticsWebviewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      AnalyticsWebviewProvider.viewType,
+      analyticsWebviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+
+  // 2. Register Navigation Focus Commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('9router.focusQuota', () => {
+      vscode.commands.executeCommand('workbench.view.extension.9router-quota');
+    }),
+    vscode.commands.registerCommand('9router.focusTopology', () => {
+      vscode.commands.executeCommand('workbench.view.extension.9router-topology');
+    }),
+    vscode.commands.registerCommand('9router.focusAnalytics', () => {
+      vscode.commands.executeCommand('workbench.view.extension.9router-analytics');
+    })
+  );
+
+  // 3. Register Filter Submenu Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.filterActive', () => {
       quotaWebviewProvider.setFilter('active');
@@ -52,7 +91,9 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.refreshStats', async () => {
       await quotaWebviewProvider.refresh();
-      await usageWebviewProvider.render();
+      await topologyWebviewProvider.render();
+      await analyticsWebviewProvider.render();
+      logsWebviewProvider.render();
       vscode.window.showInformationMessage('9Router: Quotas refreshed');
     })
   );
@@ -81,8 +122,10 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('9Router: API key berhasil disimpan ke Secret Storage.');
       }
 
+      UsageStreamService.getInstance().reconnect();
       await quotaWebviewProvider.refresh();
-      await usageWebviewProvider.render();
+      await topologyWebviewProvider.render();
+      await analyticsWebviewProvider.render();
     })
   );
 
@@ -99,23 +142,26 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     context.secrets.onDidChange(async (e) => {
       if (e.key === SECRET_KEY) {
+        UsageStreamService.getInstance().reconnect();
         await quotaWebviewProvider.refresh();
-        await usageWebviewProvider.render();
+        await topologyWebviewProvider.render();
+        await analyticsWebviewProvider.render();
       }
     })
   );
 
-  // 3. Hot-Reload Trigger Watcher
+  // 4. Hot-Reload Trigger Watcher
   setupAutoReloadTrigger(context);
 
-  // 4. Start polling timer (15m default)
-  startPolling(context, quotaWebviewProvider, usageWebviewProvider);
+  // 5. Start polling timer (15m default)
+  startPolling(context, quotaWebviewProvider, topologyWebviewProvider, analyticsWebviewProvider);
 
-  // 5. Watch configuration changes
+  // 6. Watch configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('9router')) {
-        startPolling(context, quotaWebviewProvider, usageWebviewProvider);
+        UsageStreamService.getInstance().reconnect();
+        startPolling(context, quotaWebviewProvider, topologyWebviewProvider, analyticsWebviewProvider);
       }
     })
   );
@@ -151,7 +197,8 @@ function setupAutoReloadTrigger(context: vscode.ExtensionContext) {
 function startPolling(
   context: vscode.ExtensionContext,
   quotaWebviewProvider: QuotaWebviewProvider,
-  usageWebviewProvider: UsageWebviewProvider
+  topologyWebviewProvider: TopologyWebviewProvider,
+  analyticsWebviewProvider: AnalyticsWebviewProvider
 ) {
   if (refreshTimer) {
     clearInterval(refreshTimer);
@@ -163,7 +210,8 @@ function startPolling(
 
   refreshTimer = setInterval(async () => {
     await quotaWebviewProvider.refresh();
-    await usageWebviewProvider.render();
+    await topologyWebviewProvider.render();
+    await analyticsWebviewProvider.render();
   }, intervalMs);
 
   context.subscriptions.push({

@@ -1,10 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
-  <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-  <line x1="6" y1="6" x2="6.01" y2="6"/>
-  <line x1="10" y1="6" x2="10.01" y2="6"/>
-  <line x1="6" y1="18" x2="6.01" y2="18"/>
-  <line x1="10" y1="18" x2="10.01" y2="18"/>
-  <path d="M18 10v4"/>
-  <circle cx="18" cy="12" r="2" fill="#f97316" fill-opacity="0.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="4" width="20" height="7" rx="2"/>
+  <rect x="2" y="13" width="20" height="7" rx="2"/>
+  <circle cx="6" cy="7.5" r="1" fill="currentColor"/>
+  <circle cx="9" cy="7.5" r="1" fill="currentColor"/>
+  <circle cx="6" cy="16.5" r="1" fill="currentColor"/>
+  <circle cx="9" cy="16.5" r="1" fill="currentColor"/>
+  <path d="M17 11v2"/>
 </svg>

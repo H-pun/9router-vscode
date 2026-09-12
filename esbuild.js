@@ -18,9 +18,9 @@ async function main() {
     logLevel: 'info',
   });
 
-  // 2. Build React + @xyflow/react Browser Bundle for Webview
-  const graphCtx = await esbuild.context({
-    entryPoints: ['src/graph-app/index.tsx'],
+  // 2. Build Topology Flow Bundle (Browser IIFE - React Flow)
+  const topologyCtx = await esbuild.context({
+    entryPoints: ['src/graph-app/topologyEntry.tsx'],
     bundle: true,
     format: 'iife',
     minify: production,
@@ -34,14 +34,33 @@ async function main() {
     logLevel: 'info',
   });
 
+  // 3. Build Analytics Bundle (Browser IIFE - Recharts)
+  const analyticsCtx = await esbuild.context({
+    entryPoints: ['src/graph-app/analyticsEntry.tsx'],
+    bundle: true,
+    format: 'iife',
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: 'browser',
+    outfile: 'media/analyticsFlow.js',
+    define: {
+      'process.env.NODE_ENV': production ? '"production"' : '"development"',
+    },
+    logLevel: 'info',
+  });
+
   if (watch) {
     await extCtx.watch();
-    await graphCtx.watch();
+    await topologyCtx.watch();
+    await analyticsCtx.watch();
   } else {
     await extCtx.rebuild();
-    await graphCtx.rebuild();
+    await topologyCtx.rebuild();
+    await analyticsCtx.rebuild();
     await extCtx.dispose();
-    await graphCtx.dispose();
+    await topologyCtx.dispose();
+    await analyticsCtx.dispose();
   }
 }
 

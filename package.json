@@ -1,7 +1,7 @@
 {
   "name": "9router-vscode-monitor",
   "displayName": "9Router (VS Code)",
-  "description": "Native VS Code Quota Tracker & Usage Monitor for 9Router",
+  "description": "Native VS Code Quota Tracker, Routing Topology & Usage Analytics for 9Router",
   "version": "1.0.1",
   "publisher": "harpun",
   "license": "MIT",
@@ -13,33 +13,54 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "AI",
-    "Other"
+    "AI"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "auxiliarybar": [
         {
-          "id": "9router-sidebar",
+          "id": "9router-quota",
           "title": "9Router",
           "icon": "media/router-icon.svg"
+        },
+        {
+          "id": "9router-topology",
+          "title": "Topology",
+          "icon": "media/topology-icon.svg"
+        },
+        {
+          "id": "9router-analytics",
+          "title": "Analytics",
+          "icon": "media/analytics-icon.svg"
         }
       ]
     },
     "views": {
-      "9router-sidebar": [
+      "9router-quota": [
         {
           "type": "webview",
           "id": "9router.quotaTrackerView",
-          "name": "Quota Tracker",
-          "visibility": "visible"
+          "name": "Quota"
         },
         {
           "type": "webview",
-          "id": "9router.usageView",
-          "name": "Usage",
-          "visibility": "visible"
+          "id": "9router.logsView",
+          "name": "Live Requests"
+        }
+      ],
+      "9router-topology": [
+        {
+          "type": "webview",
+          "id": "9router.topologyView",
+          "name": "Routing Topology"
+        }
+      ],
+      "9router-analytics": [
+        {
+          "type": "webview",
+          "id": "9router.analyticsView",
+          "name": "Token & Cost"
         }
       ]
     },
@@ -48,6 +69,11 @@
         "id": "9router.filterSubmenu",
         "label": "Filter Accounts",
         "icon": "$(filter)"
+      },
+      {
+        "id": "9router.moreMenu",
+        "label": "9Router",
+        "icon": "$(gear)"
       }
     ],
     "commands": [
@@ -77,6 +103,18 @@
         "command": "9router.openWebDashboard",
         "title": "Open 9Router Web Dashboard",
         "icon": "$(globe)"
+      },
+      {
+        "command": "9router.focusQuota",
+        "title": "9Router: Focus Quota Container"
+      },
+      {
+        "command": "9router.focusTopology",
+        "title": "9Router: Focus Topology Container"
+      },
+      {
+        "command": "9router.focusAnalytics",
+        "title": "9Router: Focus Analytics Container"
       }
     ],
     "menus": {
@@ -90,6 +128,29 @@
           "command": "9router.refreshStats",
           "when": "view == 9router.quotaTrackerView",
           "group": "navigation@2"
+        },
+        {
+          "submenu": "9router.moreMenu",
+          "when": "view == 9router.quotaTrackerView",
+          "group": "navigation@9"
+        },
+        {
+          "submenu": "9router.moreMenu",
+          "when": "view == 9router.topologyView",
+          "group": "navigation@9"
+        },
+        {
+          "submenu": "9router.moreMenu",
+          "when": "view == 9router.analyticsView",
+          "group": "navigation@9"
+        }
+      ],
+      "9router.moreMenu": [
+        {
+          "command": "9router.configureSettings"
+        },
+        {
+          "command": "9router.openWebDashboard"
         }
       ],
       "9router.filterSubmenu": [
@@ -137,7 +198,7 @@
     "package": "npm run build && npx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
-    "@types/lodash": "^4.17.25",
+    "@types/lodash": "^4.17.24",
     "@types/node": "^20.11.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
