@@ -12,8 +12,33 @@ import { migrateApiKey, SECRET_KEY } from './secretMigration';
 
 let refreshTimer: NodeJS.Timeout | undefined;
 
+function supportsSecondarySidebar(): boolean {
+  const config = vscode.workspace.getConfiguration('9router');
+  const manual = config.get<string>('viewLocation', 'auto');
+  if (manual === 'secondary') return true;
+  if (manual === 'activitybar') return false;
+
+  const [major, minor] = vscode.version.split('.').map(Number);
+  if (major < 1 || (major === 1 && minor < 106)) return false;
+
+  // Fork yang mencadangkan Secondary Side Bar untuk UI agent bawaannya.
+  const forks = ['cursor', 'windsurf', 'trae', 'antigravity'];
+  const app = vscode.env.appName.toLowerCase();
+  if (forks.some((f) => app.includes(f))) return false;
+
+  return true;
+}
+
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('[9Router Monitor] Extension activated');
+  console.log('[9Router Monitor] Extension activating...');
+
+  // Set context key for Secondary Side Bar vs Activity Bar fallback
+  const isNoSecondary = !supportsSecondarySidebar();
+  await vscode.commands.executeCommand(
+    'setContext',
+    '9router:noSecondarySidebar',
+    isNoSecondary
+  );
 
   // Initialize SecretStorage on DataProvider
   DataProvider.getInstance().setSecretStorage(context.secrets);
@@ -61,16 +86,19 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // 2. Register Navigation Focus Commands
+  // 2. Register Navigation Focus Commands adapting to active container
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.focusQuota', () => {
-      vscode.commands.executeCommand('workbench.view.extension.9router-quota');
+      const containerId = supportsSecondarySidebar() ? '9router-quota' : '9router-quota-alt';
+      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
     }),
     vscode.commands.registerCommand('9router.focusTopology', () => {
-      vscode.commands.executeCommand('workbench.view.extension.9router-topology');
+      const containerId = supportsSecondarySidebar() ? '9router-topology' : '9router-topology-alt';
+      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
     }),
     vscode.commands.registerCommand('9router.focusAnalytics', () => {
-      vscode.commands.executeCommand('workbench.view.extension.9router-analytics');
+      const containerId = supportsSecondarySidebar() ? '9router-analytics' : '9router-analytics-alt';
+      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
     })
   );
 
@@ -158,7 +186,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // 6. Watch configuration changes
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (e.affectsConfiguration('9router.viewLocation')) {
+        const noSec = !supportsSecondarySidebar();
+        await vscode.commands.executeCommand('setContext', '9router:noSecondarySidebar', noSec);
+      }
       if (e.affectsConfiguration('9router')) {
         UsageStreamService.getInstance().reconnect();
         startPolling(context, quotaWebviewProvider, topologyWebviewProvider, analyticsWebviewProvider);
