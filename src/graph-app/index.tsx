@@ -406,6 +406,24 @@ declare global {
   }
 }
 
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'vscode-button': any;
+      'vscode-button-group': any;
+    }
+  }
+}
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'vscode-button': any;
+      'vscode-button-group': any;
+    }
+  }
+}
+
 // ================= COMPONENT 1: TOPOLOGY GRAPH =================
 export function ProviderTopologyApp() {
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
@@ -592,80 +610,38 @@ export function UsageChartApp() {
       }}
     >
       {/* Control Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '4px' }}>
         {/* Tokens / Cost Switch */}
-        <div
-          style={{
-            display: 'inline-flex',
-            borderRadius: '4px',
-            border: '1px solid var(--vscode-dropdown-border, rgba(128,128,128,0.25))',
-            background: 'var(--vscode-dropdown-background, #252526)',
-            padding: '1px',
-          }}
-        >
-          <button
-            type="button"
+        <vscode-button-group>
+          <vscode-button
+            secondary={viewMode !== 'tokens' ? true : undefined}
             onClick={() => setViewMode('tokens')}
-            style={{
-              padding: '2px 8px',
-              fontSize: '11px',
-              fontWeight: viewMode === 'tokens' ? 'bold' : 'normal',
-              color: viewMode === 'tokens' ? '#ffffff' : 'var(--vscode-descriptionForeground, #999)',
-              background: viewMode === 'tokens' ? '#6366f1' : 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              transition: 'all 0.1s ease',
-            }}
+            style={{ fontSize: '11px', height: '22px' }}
           >
             Tokens
-          </button>
-          <button
-            type="button"
+          </vscode-button>
+          <vscode-button
+            secondary={viewMode !== 'cost' ? true : undefined}
             onClick={() => setViewMode('cost')}
-            style={{
-              padding: '2px 8px',
-              fontSize: '11px',
-              fontWeight: viewMode === 'cost' ? 'bold' : 'normal',
-              color: viewMode === 'cost' ? '#ffffff' : 'var(--vscode-descriptionForeground, #999)',
-              background: viewMode === 'cost' ? '#f59e0b' : 'transparent',
-              border: 'none',
-              borderRadius: '3px',
-              cursor: 'pointer',
-              transition: 'all 0.1s ease',
-            }}
+            style={{ fontSize: '11px', height: '22px' }}
           >
             Cost
-          </button>
-        </div>
+          </vscode-button>
+        </vscode-button-group>
 
         {/* Period Selector Pills */}
-        <div
-          style={{
-            display: 'inline-flex',
-            gap: '2px',
-          }}
-        >
+        <vscode-button-group>
           {['today', '24h', '7d', '30d'].map((p) => (
-            <button
+            <vscode-button
               key={p}
-              type="button"
+              secondary={period !== p ? true : undefined}
               onClick={() => handlePeriodChange(p)}
-              style={{
-                padding: '2px 6px',
-                fontSize: '10px',
-                fontWeight: period === p ? 600 : 'normal',
-                color: period === p ? 'var(--vscode-sideBar-foreground, #fff)' : 'var(--vscode-descriptionForeground, #888)',
-                background: period === p ? 'var(--vscode-list-hoverBackground, rgba(255,255,255,0.12))' : 'transparent',
-                border: '1px solid ' + (period === p ? 'var(--vscode-focusBorder, #007fd4)' : 'transparent'),
-                borderRadius: '3px',
-                cursor: 'pointer',
-              }}
+              style={{ fontSize: '10.5px', textTransform: 'uppercase', height: '22px' }}
             >
-              {p.toUpperCase()}
-            </button>
+              {p}
+            </vscode-button>
           ))}
-        </div>
+        </vscode-button-group>
       </div>
 
       {/* Chart Canvas Area */}
