@@ -6,7 +6,6 @@ export function getUsageWebviewHtml(
   codiconCssUri: string,
   topologyFlowJsUri: string,
   topologyFlowCssUri: string,
-  vscodeElementsJsUri: string,
   topologyProviders: TopologyProvider[],
   initialChartData: ChartDataPoint[]
 ): string {
@@ -25,14 +24,14 @@ export function getUsageWebviewHtml(
   <link rel="stylesheet" href="${topologyFlowCssUri}">
   <style>
     :root {
-      --bg: var(--vscode-sideBar-background);
-      --fg: var(--vscode-sideBar-foreground);
-      --hover-bg: var(--vscode-list-hoverBackground);
-      --text-muted: var(--vscode-descriptionForeground);
+      --bg: var(--vscode-sideBar-background, #181818);
+      --fg: var(--vscode-sideBar-foreground, #cccccc);
+      --hover-bg: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
+      --text-muted: var(--vscode-descriptionForeground, #888888);
       --border: var(--vscode-tree-indentGuidesStroke, rgba(128, 128, 128, 0.22));
-      --green: var(--vscode-charts-green, #388a34);
-      --orange: var(--vscode-charts-orange, #d18616);
-      --blue: #38bdf8;
+      --tab-active-fg: var(--vscode-panelTitle-activeForeground, var(--vscode-tab-activeForeground, #ffffff));
+      --tab-inactive-fg: var(--vscode-panelTitle-inactiveForeground, var(--vscode-tab-inactiveForeground, #888888));
+      --tab-active-border: var(--vscode-panelTitle-activeBorder, var(--vscode-focusBorder, #007fd4));
       --font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
       --font-size: var(--vscode-font-size, 13px);
     }
@@ -57,29 +56,73 @@ export function getUsageWebviewHtml(
       flex-direction: column;
     }
 
-    vscode-tabs {
-      height: 100%;
+    /* Native VS Code Tab Strip */
+    .tabs-header-strip {
       display: flex;
-      flex-direction: column;
-      padding: 0;
+      align-items: center;
+      height: 27px;
+      min-height: 27px;
+      padding-left: 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+      gap: 2px;
     }
 
-    vscode-tab-header {
+    .vsc-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      height: 27px;
+      padding: 0 8px;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid transparent;
+      margin-bottom: -1px;
+      color: var(--tab-inactive-fg);
+      font-family: var(--font);
       font-size: 11px;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.35px;
+      cursor: pointer;
+      outline: none;
+      transition: color 0.1s ease, border-color 0.1s ease;
     }
 
-    vscode-tab-header:first-of-type {
-      margin-left: 12px;
+    .vsc-tab-btn:hover {
+      color: var(--tab-active-fg);
     }
 
-    vscode-tab-panel {
+    .vsc-tab-btn.active {
+      color: var(--tab-active-fg);
+      font-weight: 600;
+      border-bottom-color: var(--tab-active-border);
+    }
+
+    .vsc-tab-btn:focus-visible {
+      outline: 1px solid var(--vscode-focusBorder, #007fd4);
+      outline-offset: -2px;
+    }
+
+    /* Tab Panels Container */
+    .tab-panels-wrapper {
       flex: 1;
-      height: 100%;
-      overflow: hidden;
-      padding: 0;
+      height: calc(100% - 27px);
       position: relative;
+      overflow: hidden;
+    }
+
+    .vsc-tab-panel {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .vsc-tab-panel.active {
+      display: block;
     }
 
     /* Tab 1: Graph Container */
@@ -183,22 +226,29 @@ export function getUsageWebviewHtml(
       font-size: 11.5px;
     }
   </style>
-  <script type="module" src="${vscodeElementsJsUri}"></script>
 </head>
 <body>
-  <vscode-tabs selected-index="0" id="usage-tabs">
-    <vscode-tab-header slot="header">Graph</vscode-tab-header>
-    <vscode-tab-panel>
+  <!-- Native Tabs Header Strip -->
+  <div class="tabs-header-strip" role="tablist">
+    <button class="vsc-tab-btn active" role="tab" id="tab-btn-graph" aria-selected="true" onclick="switchTab('graph')">Graph</button>
+    <button class="vsc-tab-btn" role="tab" id="tab-btn-activity" aria-selected="false" onclick="switchTab('activity')">Activity</button>
+    <button class="vsc-tab-btn" role="tab" id="tab-btn-logs" aria-selected="false" onclick="switchTab('logs')">Recent Requests</button>
+  </div>
+
+  <!-- Tab Panels -->
+  <div class="tab-panels-wrapper">
+    <!-- Panel 1: Graph -->
+    <div class="vsc-tab-panel active" id="tab-panel-graph" role="tabpanel">
       <div class="tab-content-graph" id="xyflow-root"></div>
-    </vscode-tab-panel>
+    </div>
 
-    <vscode-tab-header slot="header">Activity</vscode-tab-header>
-    <vscode-tab-panel>
+    <!-- Panel 2: Activity -->
+    <div class="vsc-tab-panel" id="tab-panel-activity" role="tabpanel">
       <div class="tab-content-chart" id="chart-root"></div>
-    </vscode-tab-panel>
+    </div>
 
-    <vscode-tab-header slot="header">Recent Requests</vscode-tab-header>
-    <vscode-tab-panel>
+    <!-- Panel 3: Recent Requests -->
+    <div class="vsc-tab-panel" id="tab-panel-logs" role="tabpanel">
       <div class="tab-content-table">
         <table>
           <thead>
@@ -215,8 +265,8 @@ export function getUsageWebviewHtml(
           </tbody>
         </table>
       </div>
-    </vscode-tab-panel>
-  </vscode-tabs>
+    </div>
+  </div>
 
   <script>
     const vscode = acquireVsCodeApi();
@@ -228,14 +278,26 @@ export function getUsageWebviewHtml(
 
     const providerIconMap = window.__PROVIDER_ICONS__;
 
-    // Handle tab change resize events for React Flow & Recharts
-    const tabsEl = document.getElementById('usage-tabs');
-    if (tabsEl) {
-      tabsEl.addEventListener('vsc-tabs-select', () => {
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-        }, 50);
+    function switchTab(tabId) {
+      const tabs = ['graph', 'activity', 'logs'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        const panel = document.getElementById('tab-panel-' + t);
+        if (t === tabId) {
+          btn.classList.add('active');
+          btn.setAttribute('aria-selected', 'true');
+          panel.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-selected', 'false');
+          panel.classList.remove('active');
+        }
       });
+
+      // Trigger resize event for React Flow & Recharts
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
     }
 
     function fmtNumber(n) {

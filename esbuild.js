@@ -34,30 +34,14 @@ async function main() {
     logLevel: 'info',
   });
 
-  // 3. Build @vscode-elements Bundle
-  const elementsCtx = await esbuild.context({
-    entryPoints: ['src/vscode-elements-entry.ts'],
-    bundle: true,
-    format: 'esm',
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    platform: 'browser',
-    outfile: 'media/vscodeElements.js',
-    logLevel: 'info',
-  });
-
   if (watch) {
     await extCtx.watch();
     await graphCtx.watch();
-    await elementsCtx.watch();
   } else {
     await extCtx.rebuild();
     await graphCtx.rebuild();
-    await elementsCtx.rebuild();
     await extCtx.dispose();
     await graphCtx.dispose();
-    await elementsCtx.dispose();
   }
 }
 

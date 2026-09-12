@@ -155,7 +155,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@vscode-elements/elements": "^2.5.1",
     "@xyflow/react": "^12.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

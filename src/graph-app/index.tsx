@@ -406,24 +406,6 @@ declare global {
   }
 }
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'vscode-button': any;
-      'vscode-button-group': any;
-    }
-  }
-}
-
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements {
-      'vscode-button': any;
-      'vscode-button-group': any;
-    }
-  }
-}
-
 // ================= COMPONENT 1: TOPOLOGY GRAPH =================
 export function ProviderTopologyApp() {
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
@@ -612,36 +594,101 @@ export function UsageChartApp() {
       {/* Control Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '6px' }}>
         {/* Tokens / Cost Switch */}
-        <vscode-button-group>
-          <vscode-button
-            secondary={viewMode !== 'tokens' ? true : undefined}
+        <div
+          style={{
+            display: 'inline-flex',
+            borderRadius: '3px',
+            overflow: 'hidden',
+            border: '1px solid var(--vscode-button-border, rgba(128,128,128,0.25))',
+          }}
+        >
+          <button
+            type="button"
             onClick={() => setViewMode('tokens')}
-            style={{ fontSize: '11px', height: '22px' }}
+            style={{
+              padding: '2px 10px',
+              fontSize: '11px',
+              fontFamily: 'var(--vscode-font-family, sans-serif)',
+              fontWeight: viewMode === 'tokens' ? 600 : 400,
+              color: viewMode === 'tokens'
+                ? 'var(--vscode-button-foreground, #ffffff)'
+                : 'var(--vscode-button-secondaryForeground, #cccccc)',
+              background: viewMode === 'tokens'
+                ? 'var(--vscode-button-background, #0e639c)'
+                : 'var(--vscode-button-secondaryBackground, #313131)',
+              border: 'none',
+              borderRight: '1px solid var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,0.2))',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'background 0.1s ease',
+            }}
           >
             Tokens
-          </vscode-button>
-          <vscode-button
-            secondary={viewMode !== 'cost' ? true : undefined}
+          </button>
+          <button
+            type="button"
             onClick={() => setViewMode('cost')}
-            style={{ fontSize: '11px', height: '22px' }}
+            style={{
+              padding: '2px 10px',
+              fontSize: '11px',
+              fontFamily: 'var(--vscode-font-family, sans-serif)',
+              fontWeight: viewMode === 'cost' ? 600 : 400,
+              color: viewMode === 'cost'
+                ? 'var(--vscode-button-foreground, #ffffff)'
+                : 'var(--vscode-button-secondaryForeground, #cccccc)',
+              background: viewMode === 'cost'
+                ? 'var(--vscode-button-background, #0e639c)'
+                : 'var(--vscode-button-secondaryBackground, #313131)',
+              border: 'none',
+              cursor: 'pointer',
+              outline: 'none',
+              transition: 'background 0.1s ease',
+            }}
           >
             Cost
-          </vscode-button>
-        </vscode-button-group>
+          </button>
+        </div>
 
         {/* Period Selector Pills */}
-        <vscode-button-group>
-          {['today', '24h', '7d', '30d'].map((p) => (
-            <vscode-button
-              key={p}
-              secondary={period !== p ? true : undefined}
-              onClick={() => handlePeriodChange(p)}
-              style={{ fontSize: '10.5px', textTransform: 'uppercase', height: '22px' }}
-            >
-              {p}
-            </vscode-button>
-          ))}
-        </vscode-button-group>
+        <div
+          style={{
+            display: 'inline-flex',
+            borderRadius: '3px',
+            overflow: 'hidden',
+            border: '1px solid var(--vscode-button-border, rgba(128,128,128,0.25))',
+          }}
+        >
+          {['today', '24h', '7d', '30d'].map((p, idx, arr) => {
+            const isActive = period === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => handlePeriodChange(p)}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '10.5px',
+                  textTransform: 'uppercase',
+                  fontFamily: 'var(--vscode-font-family, sans-serif)',
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive
+                    ? 'var(--vscode-button-foreground, #ffffff)'
+                    : 'var(--vscode-button-secondaryForeground, #cccccc)',
+                  background: isActive
+                    ? 'var(--vscode-button-background, #0e639c)'
+                    : 'var(--vscode-button-secondaryBackground, #313131)',
+                  border: 'none',
+                  borderRight: idx < arr.length - 1 ? '1px solid var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,0.2))' : 'none',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  transition: 'background 0.1s ease',
+                }}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Chart Canvas Area */}
