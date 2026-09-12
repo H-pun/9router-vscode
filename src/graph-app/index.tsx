@@ -603,7 +603,7 @@ export function UsageChartApp() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        padding: '8px 10px',
+        padding: '8px 0',
         boxSizing: 'border-box',
         gap: '10px',
         fontFamily: 'var(--vscode-font-family, sans-serif)',
