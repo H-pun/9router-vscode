@@ -62,7 +62,8 @@ export function getUsageWebviewHtml(
       align-items: center;
       height: 27px;
       min-height: 27px;
-      padding-left: 12px;
+      margin: 0 10px;
+      padding-left: 0;
       border-bottom: 1px solid var(--border);
       background: var(--bg);
       flex-shrink: 0;
