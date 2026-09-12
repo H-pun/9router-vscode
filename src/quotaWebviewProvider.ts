@@ -31,15 +31,36 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
           await this.refresh();
           break;
         case 'toggleActive':
-          await DataProvider.getInstance().toggleConnection(data.connectionId, data.nextActive);
-          await this.refresh();
-          break;
-        case 'testConnection':
-          const testRes = await DataProvider.getInstance().testConnection(data.connectionId);
-          if (testRes.valid) {
-            vscode.window.showInformationMessage(`9Router: Account connection valid`);
+          const success = await DataProvider.getInstance().toggleConnection(data.connectionId, data.nextActive);
+          if (!success) {
+            // Rollback optimistic state in webview
+            webviewView.webview.postMessage({
+              type: 'toggleRollback',
+              connectionId: data.connectionId,
+              prevActive: data.prevActive
+            });
+            vscode.window.showErrorMessage('9Router: Failed to update connection state. Rolled back.');
           } else {
-            vscode.window.showErrorMessage(`9Router: Test failed - ${testRes.error || 'Unknown error'}`);
+            await this.refresh();
+          }
+          break;
+        case 'test':
+        case 'testConnection':
+          webviewView.webview.postMessage({
+            type: 'testStatus',
+            connectionId: data.connectionId,
+            status: 'testing'
+          });
+          const testRes = await DataProvider.getInstance().testConnection(data.connectionId);
+          webviewView.webview.postMessage({
+            type: 'testStatus',
+            connectionId: data.connectionId,
+            status: 'idle'
+          });
+          if (testRes.valid) {
+            vscode.window.showInformationMessage(`9Router: Account "${data.name || 'Account'}" connection valid`);
+          } else {
+            vscode.window.showErrorMessage(`9Router: Test failed for "${data.name || 'Account'}" - ${testRes.error || 'Unknown error'}`);
           }
           break;
         case 'filterChange':

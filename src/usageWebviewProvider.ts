@@ -45,11 +45,22 @@ export class UsageWebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
         case 'fetchChart':
-          const chartData = await DataProvider.getInstance().fetchChartData(data.period || 'today');
-          webviewView.webview.postMessage({
-            type: 'chartData',
-            data: chartData
-          });
+          try {
+            const chartData = await DataProvider.getInstance().fetchChartData(data.period || 'today');
+            webviewView.webview.postMessage({
+              type: 'chartData',
+              success: true,
+              data: chartData,
+              period: data.period
+            });
+          } catch (err) {
+            webviewView.webview.postMessage({
+              type: 'chartData',
+              success: false,
+              prevPeriod: data.prevPeriod
+            });
+            vscode.window.showErrorMessage('9Router: Failed to load chart data. Rolled back.');
+          }
           break;
         case 'ready':
           const snapshot = UsageStreamService.getInstance().getSnapshot();

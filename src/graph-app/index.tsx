@@ -562,9 +562,16 @@ export function UsageChartApp() {
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
-      if (msg && msg.type === 'chartData' && msg.data) {
-        setData(msg.data);
-        setLoading(false);
+      if (msg && msg.type === 'chartData') {
+        if (msg.success === false) {
+          if (msg.prevPeriod) {
+            setPeriod(msg.prevPeriod);
+          }
+          setLoading(false);
+        } else if (msg.data) {
+          setData(msg.data);
+          setLoading(false);
+        }
       }
     };
     window.addEventListener('message', handler);
@@ -572,10 +579,16 @@ export function UsageChartApp() {
   }, []);
 
   const handlePeriodChange = (nextPeriod: string) => {
+    if (nextPeriod === period && !loading) return;
+    const oldPeriod = period;
     setPeriod(nextPeriod);
     setLoading(true);
     if (window.__VSCODE__) {
-      window.__VSCODE__.postMessage({ command: 'fetchChart', period: nextPeriod });
+      window.__VSCODE__.postMessage({
+        command: 'fetchChart',
+        period: nextPeriod,
+        prevPeriod: oldPeriod
+      });
     }
   };
 

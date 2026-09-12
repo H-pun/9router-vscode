@@ -539,7 +539,7 @@ export function getQuotaWebviewHtml(
                   </button>
 
                   <!-- Test Connection -->
-                  <button class="icon-btn" onclick="testConn('\${c.id}', '\${profileName}')" title="Test Connection">
+                  <button class="icon-btn" id="test-btn-\${c.id}" onclick="testConn('\${c.id}', '\${profileName}')" title="Test Connection">
                     <i class="codicon codicon-zap"></i>
                   </button>
 
@@ -616,8 +616,50 @@ export function getQuotaWebviewHtml(
     }
 
     function toggleActive(id, nextActive) {
-      vscode.postMessage({ command: 'toggleActive', connectionId: id, nextActive });
+      const conn = rawConnections.find(c => c.id === id);
+      if (!conn) return;
+
+      const prevActive = conn.isActive;
+      // 1. Optimistic Update: Immediately flip visual state locally
+      conn.isActive = nextActive;
+      renderGroupedTree();
+
+      // 2. Send command to extension host with rollback context
+      vscode.postMessage({
+        command: 'toggleActive',
+        connectionId: id,
+        nextActive: nextActive,
+        prevActive: prevActive
+      });
     }
+
+    // Webview message listener for optimistic rollback & feedback
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === 'toggleRollback') {
+        const conn = rawConnections.find(c => c.id === msg.connectionId);
+        if (conn) {
+          conn.isActive = msg.prevActive;
+          renderGroupedTree();
+        }
+      } else if (msg.type === 'testStatus') {
+        const btn = document.getElementById('test-btn-' + msg.connectionId);
+        if (btn) {
+          if (msg.status === 'testing') {
+            btn.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+            btn.disabled = true;
+          } else {
+            btn.innerHTML = '<i class="codicon codicon-zap"></i>';
+            btn.disabled = false;
+          }
+        }
+      } else if (msg.type === 'setFilter') {
+        currentFilter = msg.filter;
+        renderGroupedTree();
+      }
+    });
 
     renderGroupedTree();
   </script>
