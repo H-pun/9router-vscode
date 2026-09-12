@@ -31,8 +31,16 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
           await this.refresh();
           break;
         case 'refreshSingle':
-          await this.refresh();
-          vscode.window.showInformationMessage(`9Router: Quotas for "${data.name || 'Account'}" refreshed`);
+          try {
+            await this.refresh();
+            vscode.window.showInformationMessage(`9Router: Quotas for "${data.name || 'Account'}" refreshed`);
+          } catch (err) {
+            webviewView.webview.postMessage({
+              type: 'refreshSingleDone',
+              connectionId: data.connectionId
+            });
+            vscode.window.showErrorMessage(`9Router: Failed to refresh "${data.name || 'Account'}"`);
+          }
           break;
         case 'toggleActive':
           const success = await DataProvider.getInstance().toggleConnection(data.connectionId, data.nextActive);

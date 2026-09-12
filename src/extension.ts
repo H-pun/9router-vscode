@@ -54,16 +54,45 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Refresh Commands
+  // Refresh Commands with Native View Progress & In-Flight Lock
+  let isRefreshingStats = false;
+  let isRefreshingUsage = false;
+
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.refreshStats', async () => {
-      await quotaWebviewProvider.refresh();
-      vscode.window.showInformationMessage('9Router: Quotas refreshed');
+      if (isRefreshingStats) return;
+      isRefreshingStats = true;
+      try {
+        await vscode.window.withProgress(
+          { location: { viewId: '9router.quotaTrackerView' } },
+          async () => {
+            await quotaWebviewProvider.refresh();
+          }
+        );
+        vscode.window.showInformationMessage('9Router: Quotas refreshed');
+      } catch (err) {
+        vscode.window.showErrorMessage('9Router: Failed to refresh quotas');
+      } finally {
+        isRefreshingStats = false;
+      }
     }),
     vscode.commands.registerCommand('9router.refreshUsage', async () => {
-      UsageStreamService.getInstance().reconnect();
-      await usageWebviewProvider.render();
-      vscode.window.showInformationMessage('9Router: Usage data refreshed');
+      if (isRefreshingUsage) return;
+      isRefreshingUsage = true;
+      try {
+        await vscode.window.withProgress(
+          { location: { viewId: '9router.usageView' } },
+          async () => {
+            UsageStreamService.getInstance().reconnect();
+            await usageWebviewProvider.render();
+          }
+        );
+        vscode.window.showInformationMessage('9Router: Usage data refreshed');
+      } catch (err) {
+        vscode.window.showErrorMessage('9Router: Failed to refresh usage');
+      } finally {
+        isRefreshingUsage = false;
+      }
     })
   );
 

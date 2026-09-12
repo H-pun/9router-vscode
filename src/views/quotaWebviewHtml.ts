@@ -684,6 +684,12 @@ export function getQuotaWebviewHtml(
             btn.disabled = false;
           }
         }
+      } else if (msg.type === 'refreshSingleDone') {
+        const btn = document.getElementById('refresh-btn-' + msg.connectionId);
+        if (btn) {
+          btn.innerHTML = '<i class="codicon codicon-refresh"></i>';
+          btn.disabled = false;
+        }
       } else if (msg.type === 'setFilter') {
         currentFilter = msg.filter;
         renderGroupedTree();
