@@ -3,42 +3,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { DataProvider } from './dataProvider';
-import { QuotaWebviewProvider } from './providers/quotaWebviewProvider';
-import { LogsWebviewProvider } from './providers/logsWebviewProvider';
-import { TopologyWebviewProvider } from './providers/topologyWebviewProvider';
-import { AnalyticsWebviewProvider } from './providers/analyticsWebviewProvider';
+import { QuotaWebviewProvider } from './quotaWebviewProvider';
+import { UsageWebviewProvider } from './usageWebviewProvider';
 import { UsageStreamService } from './services/usageStreamService';
 import { migrateApiKey, SECRET_KEY } from './secretMigration';
 
 let refreshTimer: NodeJS.Timeout | undefined;
 
-function supportsSecondarySidebar(): boolean {
-  const config = vscode.workspace.getConfiguration('9router');
-  const manual = config.get<string>('viewLocation', 'auto');
-  if (manual === 'secondary') return true;
-  if (manual === 'activitybar') return false;
-
-  const [major, minor] = vscode.version.split('.').map(Number);
-  if (major < 1 || (major === 1 && minor < 106)) return false;
-
-  // Fork yang mencadangkan Secondary Side Bar untuk UI agent bawaannya.
-  const forks = ['cursor', 'windsurf', 'trae', 'antigravity'];
-  const app = vscode.env.appName.toLowerCase();
-  if (forks.some((f) => app.includes(f))) return false;
-
-  return true;
-}
-
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('[9Router Monitor] Extension activating...');
-
-  // Set context key for Secondary Side Bar vs Activity Bar fallback
-  const isNoSecondary = !supportsSecondarySidebar();
-  await vscode.commands.executeCommand(
-    'setContext',
-    '9router:noSecondarySidebar',
-    isNoSecondary
-  );
+  console.log('[9Router Monitor] Extension activated');
 
   // Initialize SecretStorage on DataProvider
   DataProvider.getInstance().setSecretStorage(context.secrets);
@@ -49,7 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Migrate legacy configuration apiKey to SecretStorage if present
   await migrateApiKey(context);
 
-  // 1. Register 4 Native Auxiliary Webview Providers with retainContextWhenHidden
+  // 1. Register Native Views (Official VS Code ViewPanes)
   const quotaWebviewProvider = new QuotaWebviewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -59,50 +32,16 @@ export async function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  const logsWebviewProvider = new LogsWebviewProvider(context.extensionUri);
+  const usageWebviewProvider = new UsageWebviewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      LogsWebviewProvider.viewType,
-      logsWebviewProvider,
+      UsageWebviewProvider.viewType,
+      usageWebviewProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
 
-  const topologyWebviewProvider = new TopologyWebviewProvider(context.extensionUri);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      TopologyWebviewProvider.viewType,
-      topologyWebviewProvider,
-      { webviewOptions: { retainContextWhenHidden: true } }
-    )
-  );
-
-  const analyticsWebviewProvider = new AnalyticsWebviewProvider(context.extensionUri);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      AnalyticsWebviewProvider.viewType,
-      analyticsWebviewProvider,
-      { webviewOptions: { retainContextWhenHidden: true } }
-    )
-  );
-
-  // 2. Register Navigation Focus Commands adapting to active container
-  context.subscriptions.push(
-    vscode.commands.registerCommand('9router.focusQuota', () => {
-      const containerId = supportsSecondarySidebar() ? '9router-quota' : '9router-quota-alt';
-      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
-    }),
-    vscode.commands.registerCommand('9router.focusTopology', () => {
-      const containerId = supportsSecondarySidebar() ? '9router-topology' : '9router-topology-alt';
-      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
-    }),
-    vscode.commands.registerCommand('9router.focusAnalytics', () => {
-      const containerId = supportsSecondarySidebar() ? '9router-analytics' : '9router-analytics-alt';
-      vscode.commands.executeCommand(`workbench.view.extension.${containerId}`);
-    })
-  );
-
-  // 3. Register Filter Submenu Commands
+  // 2. Register Filter Submenu Commands
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.filterActive', () => {
       quotaWebviewProvider.setFilter('active');
@@ -119,9 +58,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('9router.refreshStats', async () => {
       await quotaWebviewProvider.refresh();
-      await topologyWebviewProvider.render();
-      await analyticsWebviewProvider.render();
-      logsWebviewProvider.render();
+      await usageWebviewProvider.render();
       vscode.window.showInformationMessage('9Router: Quotas refreshed');
     })
   );
@@ -152,8 +89,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       UsageStreamService.getInstance().reconnect();
       await quotaWebviewProvider.refresh();
-      await topologyWebviewProvider.render();
-      await analyticsWebviewProvider.render();
+      await usageWebviewProvider.render();
     })
   );
 
@@ -172,28 +108,23 @@ export async function activate(context: vscode.ExtensionContext) {
       if (e.key === SECRET_KEY) {
         UsageStreamService.getInstance().reconnect();
         await quotaWebviewProvider.refresh();
-        await topologyWebviewProvider.render();
-        await analyticsWebviewProvider.render();
+        await usageWebviewProvider.render();
       }
     })
   );
 
-  // 4. Hot-Reload Trigger Watcher
+  // 3. Hot-Reload Trigger Watcher
   setupAutoReloadTrigger(context);
 
-  // 5. Start polling timer (15m default)
-  startPolling(context, quotaWebviewProvider, topologyWebviewProvider, analyticsWebviewProvider);
+  // 4. Start polling timer (15m default)
+  startPolling(context, quotaWebviewProvider, usageWebviewProvider);
 
-  // 6. Watch configuration changes
+  // 5. Watch configuration changes
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async (e) => {
-      if (e.affectsConfiguration('9router.viewLocation')) {
-        const noSec = !supportsSecondarySidebar();
-        await vscode.commands.executeCommand('setContext', '9router:noSecondarySidebar', noSec);
-      }
+    vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('9router')) {
         UsageStreamService.getInstance().reconnect();
-        startPolling(context, quotaWebviewProvider, topologyWebviewProvider, analyticsWebviewProvider);
+        startPolling(context, quotaWebviewProvider, usageWebviewProvider);
       }
     })
   );
@@ -229,8 +160,7 @@ function setupAutoReloadTrigger(context: vscode.ExtensionContext) {
 function startPolling(
   context: vscode.ExtensionContext,
   quotaWebviewProvider: QuotaWebviewProvider,
-  topologyWebviewProvider: TopologyWebviewProvider,
-  analyticsWebviewProvider: AnalyticsWebviewProvider
+  usageWebviewProvider: UsageWebviewProvider
 ) {
   if (refreshTimer) {
     clearInterval(refreshTimer);
@@ -242,8 +172,7 @@ function startPolling(
 
   refreshTimer = setInterval(async () => {
     await quotaWebviewProvider.refresh();
-    await topologyWebviewProvider.render();
-    await analyticsWebviewProvider.render();
+    await usageWebviewProvider.render();
   }, intervalMs);
 
   context.subscriptions.push({

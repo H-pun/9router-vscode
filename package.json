@@ -1,7 +1,7 @@
 {
   "name": "9router-vscode-monitor",
   "displayName": "9Router (VS Code)",
-  "description": "Native VS Code Quota Tracker, Routing Topology & Usage Analytics for 9Router",
+  "description": "Native VS Code Quota Tracker & Usage Monitor for 9Router",
   "version": "1.0.1",
   "publisher": "harpun",
   "license": "MIT",
@@ -10,109 +10,33 @@
     "url": "https://github.com/H-pun/9router-vscode.git"
   },
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "AI"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onStartupFinished"
-  ],
   "contributes": {
     "viewsContainers": {
-      "secondarySidebar": [
-        {
-          "id": "9router-quota",
-          "title": "9Router",
-          "icon": "media/router-icon.svg",
-          "when": "!9router:noSecondarySidebar"
-        },
-        {
-          "id": "9router-topology",
-          "title": "Topology",
-          "icon": "media/topology-icon.svg",
-          "when": "!9router:noSecondarySidebar"
-        },
-        {
-          "id": "9router-analytics",
-          "title": "Analytics",
-          "icon": "media/analytics-icon.svg",
-          "when": "!9router:noSecondarySidebar"
-        }
-      ],
       "activitybar": [
         {
-          "id": "9router-quota-alt",
+          "id": "9router-sidebar",
           "title": "9Router",
-          "icon": "media/router-icon.svg",
-          "when": "9router:noSecondarySidebar"
-        },
-        {
-          "id": "9router-topology-alt",
-          "title": "Topology",
-          "icon": "media/topology-icon.svg",
-          "when": "9router:noSecondarySidebar"
-        },
-        {
-          "id": "9router-analytics-alt",
-          "title": "Analytics",
-          "icon": "media/analytics-icon.svg",
-          "when": "9router:noSecondarySidebar"
+          "icon": "media/router-icon.svg"
         }
       ]
     },
     "views": {
-      "9router-quota": [
+      "9router-sidebar": [
         {
           "type": "webview",
           "id": "9router.quotaTrackerView",
-          "name": "Quota"
+          "name": "Quota Tracker"
         },
         {
           "type": "webview",
-          "id": "9router.logsView",
-          "name": "Live Requests"
-        }
-      ],
-      "9router-quota-alt": [
-        {
-          "type": "webview",
-          "id": "9router.quotaTrackerView",
-          "name": "Quota"
-        },
-        {
-          "type": "webview",
-          "id": "9router.logsView",
-          "name": "Live Requests"
-        }
-      ],
-      "9router-topology": [
-        {
-          "type": "webview",
-          "id": "9router.topologyView",
-          "name": "Routing Topology"
-        }
-      ],
-      "9router-topology-alt": [
-        {
-          "type": "webview",
-          "id": "9router.topologyView",
-          "name": "Routing Topology"
-        }
-      ],
-      "9router-analytics": [
-        {
-          "type": "webview",
-          "id": "9router.analyticsView",
-          "name": "Token & Cost"
-        }
-      ],
-      "9router-analytics-alt": [
-        {
-          "type": "webview",
-          "id": "9router.analyticsView",
-          "name": "Token & Cost"
+          "id": "9router.usageView",
+          "name": "Usage"
         }
       ]
     },
@@ -121,11 +45,6 @@
         "id": "9router.filterSubmenu",
         "label": "Filter Accounts",
         "icon": "$(filter)"
-      },
-      {
-        "id": "9router.moreMenu",
-        "label": "9Router",
-        "icon": "$(gear)"
       }
     ],
     "commands": [
@@ -155,18 +74,6 @@
         "command": "9router.openWebDashboard",
         "title": "Open 9Router Web Dashboard",
         "icon": "$(globe)"
-      },
-      {
-        "command": "9router.focusQuota",
-        "title": "9Router: Focus Quota Container"
-      },
-      {
-        "command": "9router.focusTopology",
-        "title": "9Router: Focus Topology Container"
-      },
-      {
-        "command": "9router.focusAnalytics",
-        "title": "9Router: Focus Analytics Container"
       }
     ],
     "menus": {
@@ -182,27 +89,14 @@
           "group": "navigation@2"
         },
         {
-          "submenu": "9router.moreMenu",
+          "command": "9router.configureSettings",
           "when": "view == 9router.quotaTrackerView",
-          "group": "navigation@9"
+          "group": "navigation@3"
         },
         {
-          "submenu": "9router.moreMenu",
-          "when": "view == 9router.topologyView",
-          "group": "navigation@9"
-        },
-        {
-          "submenu": "9router.moreMenu",
-          "when": "view == 9router.analyticsView",
-          "group": "navigation@9"
-        }
-      ],
-      "9router.moreMenu": [
-        {
-          "command": "9router.configureSettings"
-        },
-        {
-          "command": "9router.openWebDashboard"
+          "command": "9router.openWebDashboard",
+          "when": "view == 9router.quotaTrackerView",
+          "group": "navigation@4"
         }
       ],
       "9router.filterSubmenu": [
@@ -238,16 +132,6 @@
           "type": "number",
           "default": 900,
           "description": "Auto-refresh interval in seconds for quota tracking (default: 900s / 15 mins)"
-        },
-        "9router.viewLocation": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "secondary",
-            "activitybar"
-          ],
-          "default": "auto",
-          "description": "Preferred sidebar location for 9Router view containers (auto: Secondary Side Bar on VS Code >= 1.106, Activity Bar on forks/older versions)."
         }
       }
     }

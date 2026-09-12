@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getLogsWebviewHtml } from '../views/logsWebviewHtml';
-import { UsageStreamService } from '../services/usageStreamService';
+import { DataProvider, UsageStreamData } from './dataProvider';
+import { getUsageWebviewHtml } from './views/usageWebviewHtml';
+import { UsageStreamService } from './services/usageStreamService';
 
-export class LogsWebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = '9router.logsView';
+export class UsageWebviewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = '9router.usageView';
   private _view?: vscode.WebviewView;
   private _streamUnsub?: () => void;
 
@@ -25,12 +26,12 @@ export class LogsWebviewProvider implements vscode.WebviewViewProvider {
 
     this.render();
 
-    // Subscribe to SSE Singleton
-    this._streamUnsub = UsageStreamService.getInstance().subscribe((data) => {
+    // Subscribe to SSE Singleton Service
+    this._streamUnsub = UsageStreamService.getInstance().subscribe((streamData: UsageStreamData) => {
       if (this._view) {
         this._view.webview.postMessage({
           type: 'usageStream',
-          data,
+          data: streamData
         });
       }
     });
@@ -41,28 +42,50 @@ export class LogsWebviewProvider implements vscode.WebviewViewProvider {
       }
     });
 
-    webviewView.webview.onDidReceiveMessage((data) => {
+    webviewView.webview.onDidReceiveMessage(async (data) => {
       switch (data.command) {
+        case 'fetchChart':
+          const chartData = await DataProvider.getInstance().fetchChartData(data.period || 'today');
+          webviewView.webview.postMessage({
+            type: 'chartData',
+            data: chartData
+          });
+          break;
         case 'ready':
           const snapshot = UsageStreamService.getInstance().getSnapshot();
           webviewView.webview.postMessage({
-            type: 'usageSnapshot',
-            data: snapshot,
+            type: 'usageStream',
+            data: snapshot
           });
           break;
       }
     });
   }
 
-  public render() {
+  public async render() {
     if (this._view) {
+      const data = await DataProvider.getInstance().fetchQuotas();
       const initialUsage = UsageStreamService.getInstance().getSnapshot();
       const iconMap = this.getProviderIconMap(this._view.webview);
       const codiconCssUri = this._view.webview
         .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicons', 'codicon.css'))
         .toString();
+      const topologyFlowJsUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.js'))
+        .toString();
+      const topologyFlowCssUri = this._view.webview
+        .asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'topologyFlow.css'))
+        .toString();
 
-      this._view.webview.html = getLogsWebviewHtml(initialUsage, iconMap, codiconCssUri);
+      this._view.webview.html = getUsageWebviewHtml(
+        initialUsage,
+        iconMap,
+        codiconCssUri,
+        topologyFlowJsUri,
+        topologyFlowCssUri,
+        data.topologyProviders || [],
+        data.initialChartData || []
+      );
     }
   }
 
