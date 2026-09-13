@@ -46,7 +46,7 @@ Native VS Code sidebar extension for monitoring and managing [9Router](https://g
 
 *Or install via terminal:*
 ```bash
-code --install-extension 9router-vscode-1.0.2.vsix
+code --install-extension 9router-vscode-1.0.3.vsix
 ```
 
 ---

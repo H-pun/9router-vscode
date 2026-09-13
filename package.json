@@ -2,7 +2,7 @@
   "name": "9router-vscode-monitor",
   "displayName": "9Router (VS Code)",
   "description": "Native VS Code Quota Tracker & Usage Monitor for 9Router",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "harpun",
   "license": "MIT",
   "repository": {
