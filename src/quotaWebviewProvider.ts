@@ -50,13 +50,15 @@ export class QuotaWebviewProvider implements vscode.WebviewViewProvider {
               connectionId: data.connectionId,
               prevActive: data.prevActive
             });
-            vscode.window.showErrorMessage('9Router: Failed to update connection state.');
+            vscode.window.showErrorMessage(`9Router: Failed to update status for "${data.name || 'Account'}"`);
           } else {
             webviewView.webview.postMessage({
               type: 'toggleResult',
               connectionId: data.connectionId,
               success: true
             });
+            const statusLabel = data.nextActive ? 'Active (ON)' : 'Inactive (OFF)';
+            vscode.window.showInformationMessage(`9Router: "${data.name || 'Account'}" switched to ${statusLabel}`);
             await this.refresh();
           }
           break;

@@ -54,7 +54,7 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Refresh Commands with Native View Progress & In-Flight Lock
+  // Refresh Commands with Native View Progress, Dynamic Spinning Icon & In-Flight Lock
   let isRefreshingStats = false;
   let isRefreshingUsage = false;
 
@@ -62,6 +62,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('9router.refreshStats', async () => {
       if (isRefreshingStats) return;
       isRefreshingStats = true;
+      await vscode.commands.executeCommand('setContext', '9router:isRefreshingStats', true);
       try {
         await vscode.window.withProgress(
           { location: { viewId: '9router.quotaTrackerView' } },
@@ -74,11 +75,13 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('9Router: Failed to refresh quotas');
       } finally {
         isRefreshingStats = false;
+        await vscode.commands.executeCommand('setContext', '9router:isRefreshingStats', false);
       }
     }),
     vscode.commands.registerCommand('9router.refreshUsage', async () => {
       if (isRefreshingUsage) return;
       isRefreshingUsage = true;
+      await vscode.commands.executeCommand('setContext', '9router:isRefreshingUsage', true);
       try {
         await vscode.window.withProgress(
           { location: { viewId: '9router.usageView' } },
@@ -92,8 +95,11 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.showErrorMessage('9Router: Failed to refresh usage');
       } finally {
         isRefreshingUsage = false;
+        await vscode.commands.executeCommand('setContext', '9router:isRefreshingUsage', false);
       }
-    })
+    }),
+    vscode.commands.registerCommand('9router.refreshStatsLoading', () => {}),
+    vscode.commands.registerCommand('9router.refreshUsageLoading', () => {})
   );
 
   // Settings Wizard using SecretStorage for apiKey

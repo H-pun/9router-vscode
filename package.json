@@ -66,9 +66,21 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "9router.refreshStatsLoading",
+        "title": "Refreshing Quotas...",
+        "icon": "$(loading~spin)",
+        "enablement": "false"
+      },
+      {
         "command": "9router.refreshUsage",
         "title": "Refresh Usage",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "9router.refreshUsageLoading",
+        "title": "Refreshing Usage...",
+        "icon": "$(loading~spin)",
+        "enablement": "false"
       },
       {
         "command": "9router.configureSettings",
@@ -90,7 +102,12 @@
         },
         {
           "command": "9router.refreshStats",
-          "when": "view == 9router.quotaTrackerView",
+          "when": "view == 9router.quotaTrackerView && !9router:isRefreshingStats",
+          "group": "navigation@2"
+        },
+        {
+          "command": "9router.refreshStatsLoading",
+          "when": "view == 9router.quotaTrackerView && 9router:isRefreshingStats",
           "group": "navigation@2"
         },
         {
@@ -105,7 +122,12 @@
         },
         {
           "command": "9router.refreshUsage",
-          "when": "view == 9router.usageView",
+          "when": "view == 9router.usageView && !9router:isRefreshingUsage",
+          "group": "navigation@1"
+        },
+        {
+          "command": "9router.refreshUsageLoading",
+          "when": "view == 9router.usageView && 9router:isRefreshingUsage",
           "group": "navigation@1"
         }
       ],

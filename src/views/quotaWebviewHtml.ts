@@ -552,7 +552,7 @@ export function getQuotaWebviewHtml(
                   </button>
 
                   <!-- Native-style ON/OFF Toggle Switch -->
-                  <div class="toggle-switch-box \${inFlightMap[c.id] ? 'disabled' : ''}" id="toggle-box-\${c.id}" onclick="toggleActive('\${c.id}', \${!c.isActive})" title="\${inFlightMap[c.id] ? 'Updating...' : (c.isActive ? 'Active (Click to Turn OFF)' : 'Idle (Click to Turn ON)')}">
+                  <div class="toggle-switch-box \${inFlightMap[c.id] ? 'disabled' : ''}" id="toggle-box-\${c.id}" onclick="toggleActive('\${c.id}', \${!c.isActive}, '\${profileName}')" title="\${inFlightMap[c.id] ? 'Updating...' : (c.isActive ? 'Active (Click to Turn OFF)' : 'Idle (Click to Turn ON)')}">
                     <div class="toggle-track \${c.isActive ? 'active' : ''}">
                       <div class="toggle-thumb"></div>
                     </div>
@@ -633,7 +633,7 @@ export function getQuotaWebviewHtml(
       vscode.postMessage({ command: 'test', connectionId: id, name });
     }
 
-    function toggleActive(id, nextActive) {
+    function toggleActive(id, nextActive, name) {
       if (inFlightMap[id]) return;
 
       const conn = connections.find(c => c.id === id);
@@ -649,6 +649,7 @@ export function getQuotaWebviewHtml(
       vscode.postMessage({
         command: 'toggleActive',
         connectionId: id,
+        name: name || conn.name || conn.email || 'Account',
         nextActive: nextActive,
         prevActive: prevActive
       });
